@@ -9,6 +9,8 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
+#include "LcdRgb.h"
+
 void check_memory() {
 	// 检查总的外置内存
 	size_t psram_size = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
@@ -45,9 +47,10 @@ static const char *TAG = "app_main"; // 定义日志标签
 
 void app_main(void)
 {
+	rgb_main();
 	while(1){
-		check_memory();
-		check_flash();
+		// check_memory();
+		// check_flash();
 		ESP_LOGI(TAG, "Hello ESP32S3!"); // 输出日志到串口
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1000ms
 	}
