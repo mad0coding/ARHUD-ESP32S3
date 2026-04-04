@@ -9,6 +9,20 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
+#include "esp_efuse.h"
+#include "esp_efuse_table.h"
+
+
+void efuse_read(void) {
+    uint32_t value = 0;
+
+    esp_efuse_read_field_blob(ESP_EFUSE_VDD_SPI_FORCE, &value, 1);
+    printf("VDD_SPI_FORCE: %lu\n", value);
+
+    esp_efuse_read_field_blob(ESP_EFUSE_VDD_SPI_TIEH, &value, 1);
+    printf("VDD_SPI_TIEH: %lu\n", value);
+}
+
 void check_memory() {
 	// 检查总的外置内存
 	size_t psram_size = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
@@ -45,9 +59,10 @@ static const char *TAG = "app_main"; // 定义日志标签
 
 void app_main(void)
 {
+	efuse_read();
 	while(1){
-		check_memory();
-		check_flash();
+		// check_memory();
+		// check_flash();
 		ESP_LOGI(TAG, "Hello ESP32S3!"); // 输出日志到串口
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 延时1000ms
 	}
