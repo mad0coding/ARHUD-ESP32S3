@@ -33,6 +33,16 @@ void init_gpio(void) // GPIO input output init
 		.intr_type = GPIO_INTR_DISABLE,
 	};
 	gpio_config(&io_conf_out);
+
+	// Output DISP
+	gpio_config_t io_conf_out_disp = {
+		.pin_bit_mask = (1ULL << IO_DISP),
+		.mode = GPIO_MODE_OUTPUT,
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE,
+	};
+	gpio_config(&io_conf_out_disp);
 }
 
 void init_adc(void) // ADC init
@@ -104,7 +114,7 @@ void io_main(void)
 	int led_state = 0;
 	int pwm_duty = 0;
 
-	while (1) {
+	while (0) {
 		// read key (invert logic)
 		int btn_val = gpio_get_level(IO_KEY);
 		
@@ -132,6 +142,9 @@ void io_main(void)
 
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
+	gpio_set_level(IO_DISP, 1);
+	ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT, 500));
+	ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT));
 }
 
 

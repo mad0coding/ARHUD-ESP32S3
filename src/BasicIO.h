@@ -8,6 +8,7 @@
 
 // GPIO Output
 #define IO_LED					GPIO_NUM_21
+#define IO_DISP					GPIO_NUM_20
 
 // ADC Input
 #define ADC_UNIT				ADC_UNIT_1 // unit 1 (can be used with RF)
