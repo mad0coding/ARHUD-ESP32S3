@@ -1,6 +1,5 @@
 #include "LcdRgb.h"
 
-
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
@@ -12,63 +11,9 @@
 #include "freertos/task.h"
 #include "esp_log.h"
 
-// 定义屏幕参数 (根据你的屏幕手册修改)
-#define LCD_H_RES				800//(4*160)//640
-#define LCD_V_RES				480//(3*160)//480
-// #define LCD_PIN_PCLK			GPIO_NUM_42
-// #define LCD_PIN_DE				GPIO_NUM_41
-// #define LCD_PIN_VSYNC			GPIO_NUM_40
-// #define LCD_PIN_HSYNC			GPIO_NUM_39
 
-// #define LCD_PIN_PCLK			GPIO_NUM_8
-// #define LCD_PIN_DE				GPIO_NUM_46
-// #define LCD_PIN_VSYNC			GPIO_NUM_3
-// #define LCD_PIN_HSYNC			GPIO_NUM_NC
+uint8_t *LCD_Buf = NULL, *LCD_Buf0 = NULL, *LCD_Buf1 = NULL; // 选中的缓冲指针 和 双缓冲实际指针
 
-#define LCD_PIN_PCLK			GPIO_NUM_19
-#define LCD_PIN_DE				GPIO_NUM_13
-#define LCD_PIN_VSYNC			GPIO_NUM_46
-#define LCD_PIN_HSYNC			GPIO_NUM_3
-
-// #define LCD_PIN_PCLK			GPIO_NUM_8
-// #define LCD_PIN_DE				GPIO_NUM_NC
-// #define LCD_PIN_VSYNC			GPIO_NUM_3
-// #define LCD_PIN_HSYNC			GPIO_NUM_46
-
-// RGB 数据引脚 (这里仅列出部分示例，S3最多支持8位或16位)
-// #define LCD_PIN_DATA0			GPIO_NUM_1
-// #define LCD_PIN_DATA1			GPIO_NUM_2
-// #define LCD_PIN_DATA2			GPIO_NUM_3
-// #define LCD_PIN_DATA3			GPIO_NUM_4
-
-// #define LCD_PIN_DATA0			GPIO_NUM_4
-// #define LCD_PIN_DATA1			GPIO_NUM_5
-// #define LCD_PIN_DATA2			GPIO_NUM_6
-// #define LCD_PIN_DATA3			GPIO_NUM_8
-// #define LCD_PIN_DATA4			GPIO_NUM_15
-// #define LCD_PIN_DATA5			GPIO_NUM_16
-// #define LCD_PIN_DATA6			GPIO_NUM_17
-// #define LCD_PIN_DATA7			GPIO_NUM_18
-
-// #define LCD_PIN_DATA0			GPIO_NUM_16
-// #define LCD_PIN_DATA1			GPIO_NUM_15
-// #define LCD_PIN_DATA2			GPIO_NUM_18
-// #define LCD_PIN_DATA3			GPIO_NUM_17
-// #define LCD_PIN_DATA4			GPIO_NUM_7
-// #define LCD_PIN_DATA5			GPIO_NUM_6
-// #define LCD_PIN_DATA6			GPIO_NUM_5
-// #define LCD_PIN_DATA7			GPIO_NUM_4
-
-#define LCD_PIN_DATA0			GPIO_NUM_18
-#define LCD_PIN_DATA1			GPIO_NUM_8
-#define LCD_PIN_DATA2			GPIO_NUM_15
-#define LCD_PIN_DATA3			GPIO_NUM_16
-#define LCD_PIN_DATA4			GPIO_NUM_17
-#define LCD_PIN_DATA5			GPIO_NUM_5
-#define LCD_PIN_DATA6			GPIO_NUM_6
-#define LCD_PIN_DATA7			GPIO_NUM_7
-
-uint8_t testBuf[100*100];
 
 void rgb_main(void)
 {
@@ -78,21 +23,12 @@ void rgb_main(void)
 	esp_lcd_rgb_panel_config_t rgb_cfg = {
 		.clk_src = LCD_CLK_SRC_DEFAULT,
 		.timings = {
+			// 时钟频率
 			.pclk_hz = 20 * 1000 * 1000, // 20MHz
+			// 屏幕尺寸
 			.h_res = LCD_H_RES,
 			.v_res = LCD_V_RES,
-			// .hsync_pulse_width = 4,
-			// .hsync_back_porch = 8,
-			// .hsync_front_porch = 8,
-			// .vsync_pulse_width = 4,
-			// .vsync_back_porch = 8,
-			// .vsync_front_porch = 8,
-			// .hsync_pulse_width = 1,
-			// .hsync_back_porch = 1,
-			// .hsync_front_porch = 1,
-			// .vsync_pulse_width = 1,
-			// .vsync_back_porch = 1,
-			// .vsync_front_porch = 1,
+			// 时序参数
 			.hsync_pulse_width = 8,
 			.hsync_back_porch = 10,
 			.hsync_front_porch = 50,
@@ -100,19 +36,20 @@ void rgb_main(void)
 			.vsync_back_porch = 16,
 			.vsync_front_porch = 60,
 		},
-		.data_width = /*16*/8, // number of data lines
-		.bits_per_pixel = /*16*/8, // color depth
+		.data_width = 8, // number of data lines
+		.bits_per_pixel = 8, // color depth
 		.de_gpio_num = LCD_PIN_DE,
 		.pclk_gpio_num = LCD_PIN_PCLK,
 		.vsync_gpio_num = LCD_PIN_VSYNC,
 		.hsync_gpio_num = LCD_PIN_HSYNC,
 		.data_gpio_nums = {
 			LCD_PIN_DATA0, LCD_PIN_DATA1, LCD_PIN_DATA2, LCD_PIN_DATA3,
-			LCD_PIN_DATA4, LCD_PIN_DATA5, LCD_PIN_DATA6, LCD_PIN_DATA7, // ... 填满 16 个引脚
+			LCD_PIN_DATA4, LCD_PIN_DATA5, LCD_PIN_DATA6, LCD_PIN_DATA7, // 填满 8 或 16 个引脚
 		},
-		.flags.refresh_on_demand = 0, // 不用自动刷新 改为手动刷新
 		.flags.fb_in_psram = 1, // 将帧缓冲放在PSRAM
-		.flags.double_fb = 1, // 使用双缓冲
+		.num_fbs = 2, // 申请两个缓冲区
+		.flags.double_fb = 0, // 不使用双缓冲自动切换 后面手动设置
+		.flags.refresh_on_demand = 0, // 不手动刷新 使用自动刷新
 	};
 
 	// 2. 安装 RGB 面板驱动
@@ -122,87 +59,37 @@ void rgb_main(void)
 	ESP_ERROR_CHECK(esp_lcd_panel_reset(panel_handle));
 	ESP_ERROR_CHECK(esp_lcd_panel_init(panel_handle));
 
-	// 4. 测试：绘制一个简单的色块
-	// 定义一个 10x10 的红色区域 (RGB565: 0xF800)
-	uint16_t color_data[4 * 3];
-	for(int i = 0; i < 4 * 3; i++){
-		color_data[i] = (~(i+1) << 12) | ((i+1) << 4);//0xABCD;
-	}
+	// 获取驱动初始化时自动创建的2个缓冲区地址
+	ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, (void**)&LCD_Buf0, (void**)&LCD_Buf1));
+	printf("LCD_Buf0: 0x%lX, LCD_Buf1: 0x%lX\n", (uint32_t)LCD_Buf0, (uint32_t)LCD_Buf1);
+	// memset(LCD_Buf0, 0xE0, LCD_FRAME_SIZE);
+	// memset(LCD_Buf1, 0x1C, LCD_FRAME_SIZE);
 	
 	uint16_t frameCnt = 0;
-	uint16_t DVP_bufAddr[512];
-	while(1){frameCnt += 8;
+	while(1){
+		frameCnt += 8;
 		ESP_LOGI("RGB", "test"); // 输出日志到串口
-		for(int j = 0; j < 480; j++){
+
+		LCD_Buf = (LCD_Buf != LCD_Buf0) ? LCD_Buf0 : LCD_Buf1; // 双缓冲指针切换
+
+		for(int j = 0; j < LCD_V_RES; j++){ // 双向变色光效
 			uint16_t y = j;
-			for(int i = 0; i < 800; i++){ // 模拟DVP DMA填充RGB数据
+			for(int i = 0; i < LCD_H_RES; i++){
 				uint16_t x = i;
 				uint8_t r8 = frameCnt + y + x; // R
 				uint8_t g8 = frameCnt - y; // G
 				uint8_t b8 = frameCnt + y; // B
-				testBuf[x] = (r8 & 0xE0) | (g8 & 0xE0) >> 3 | (b8 & 0xC0) >> 6;
-				// testBuf[x] = 0xE0;
+				LCD_Buf[y*LCD_H_RES + x] = (r8 & 0xE0) | (g8 & 0xE0) >> 3 | (b8 & 0xC0) >> 6;
 			}
-			esp_lcd_panel_draw_bitmap(panel_handle, 0, y, 800, y+1, testBuf);
-			// continue;
-
-			// for(int j = 0; j < (800*480/160); j++){
-			// 	uint16_t x = (j % 4) * 160, y = j / 4;
-			// 	for(int i = 0; i < 160; i++){ // 模拟DVP DMA填充RGB数据
-			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = frameCnt + y+x+i/* (((y+x+i)/320)*2-1)*/; // R
-			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = frameCnt - y; // G
-			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = frameCnt + y; // B
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j+i*3+0;//128; // R
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j+i*3+1;//128 - j; // G
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j+i*3+2;//128 + j; // B
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j;//128; // R
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j;//128 - j; // G
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j;//128 + j; // B
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = 0;//128; // R
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = 0;//128 - j; // G
-			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = 0;//128 + j; // B
-			// 	}
-			// 	// ((uint16_t*)DVP_bufAddr)[0] = 0x5A5A; // 测试代码
-			// 	// ((uint16_t*)DVP_bufAddr)[1] = j; // j
-			// 	// ((uint16_t*)DVP_bufAddr)[2] = x; // x
-			// 	// ((uint16_t*)DVP_bufAddr)[3] = y; // y
-			// 	// ((uint16_t*)DVP_bufAddr)[(160*3-2)/2] = 0x1616; // 
-			// 	// ((uint16_t*)DVP_bufAddr)[(160*3+0)/2] = 0x2F2F; // 
-			// 	// esp_lcd_panel_draw_bitmap(panel_handle, 0, j, 160, j+1, DVP_bufAddr);
-			// 	esp_lcd_panel_draw_bitmap(panel_handle, x+0, y, x+160, y+1, DVP_bufAddr);
-			// }
 		}
-		// esp_lcd_rgb_panel_refresh(panel_handle);
-		vTaskDelay(pdMS_TO_TICKS(1));
+		// gpio_set_level(IO_LED, 1);
+		esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, LCD_Buf);
+		// gpio_set_level(IO_LED, 0);
+		vTaskDelay(pdMS_TO_TICKS(10));
 	}
 	// 将这块数据刷新到帧缓存的 (0,0) 到 (10,10) 坐标 外设会自动反复发送
 	// esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, 10, 10, color_data);
 	// esp_lcd_panel_draw_bitmap(panel_handle, 10, 10, 10, 10, color_data);
-
-	memset(testBuf, 0xFF, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, 100, 100, testBuf);
-	memset(testBuf, 0xFF, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 0, 380, 100, 480, testBuf);
-	memset(testBuf, 0xFF, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 700, 0, 800, 100, testBuf);
-	memset(testBuf, 0xFF, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 700, 380, 800, 480, testBuf);
-
-	memset(testBuf, 0x03, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 100, 100, 200, 200, testBuf);
-	memset(testBuf, 0x1C, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 200, 200, 300, 300, testBuf);
-	memset(testBuf, 0xE0, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 300, 300, 400, 400, testBuf);
-
-	memset(testBuf, 0x6E, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 200, 0, 300, 100, testBuf);
-	memset(testBuf, 0xF8, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 300, 100, 400, 200, testBuf);
-	memset(testBuf, 0x1F, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 400, 200, 500, 300, testBuf);
-	memset(testBuf, 0xE3, 100*100);
-	esp_lcd_panel_draw_bitmap(panel_handle, 500, 300, 600, 400, testBuf);
 
 	printf("LCD RGB panel initialized and test pattern sent.\n");
 }
