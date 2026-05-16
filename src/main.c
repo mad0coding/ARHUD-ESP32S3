@@ -10,6 +10,7 @@
 #include "esp_heap_caps.h"
 
 #include "LcdRgb.h"
+#include "BasicIO.h"
 
 void check_memory() {
 	// 检查总的外置内存
@@ -47,6 +48,7 @@ static const char *TAG = "app_main"; // 定义日志标签
 
 void app_main(void)
 {
+	io_main();
 	rgb_main();
 	while(1){
 		// check_memory();
