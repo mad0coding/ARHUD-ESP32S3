@@ -93,7 +93,7 @@ void rgb_main(void)
 			// .vsync_pulse_width = 1,
 			// .vsync_back_porch = 1,
 			// .vsync_front_porch = 1,
-			.hsync_pulse_width = 8*1,
+			.hsync_pulse_width = 8,
 			.hsync_back_porch = 10,
 			.hsync_front_porch = 50,
 			.vsync_pulse_width = 4,
@@ -131,37 +131,49 @@ void rgb_main(void)
 	
 	uint16_t frameCnt = 0;
 	uint16_t DVP_bufAddr[512];
-	while(0){frameCnt += 8;
-	// vTaskDelay(pdMS_TO_TICKS(1)); // 延时1ms
-	// esp_task_wdt_reset();
-	ESP_LOGI("RGB", "test"); // 输出日志到串口
-	for(int j = 0; j < (640*480/160); j++){
-		uint16_t x = (j % 4) * 160, y = j / 4;
-		for(int i = 0; i < 160; i++){ // 模拟DVP DMA填充RGB数据
-			((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = frameCnt + y+x+i/* (((y+x+i)/320)*2-1)*/; // R
-			((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = frameCnt - y; // G
-			((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = frameCnt + y; // B
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j+i*3+0;//128; // R
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j+i*3+1;//128 - j; // G
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j+i*3+2;//128 + j; // B
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j;//128; // R
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j;//128 - j; // G
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j;//128 + j; // B
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = 0;//128; // R
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = 0;//128 - j; // G
-			// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = 0;//128 + j; // B
+	while(1){frameCnt += 8;
+		ESP_LOGI("RGB", "test"); // 输出日志到串口
+		for(int j = 0; j < 480; j++){
+			uint16_t y = j;
+			for(int i = 0; i < 800; i++){ // 模拟DVP DMA填充RGB数据
+				uint16_t x = i;
+				uint8_t r8 = frameCnt + y + x; // R
+				uint8_t g8 = frameCnt - y; // G
+				uint8_t b8 = frameCnt + y; // B
+				testBuf[x] = (r8 & 0xE0) | (g8 & 0xE0) >> 3 | (b8 & 0xC0) >> 6;
+				// testBuf[x] = 0xE0;
+			}
+			esp_lcd_panel_draw_bitmap(panel_handle, 0, y, 800, y+1, testBuf);
+			// continue;
+
+			// for(int j = 0; j < (800*480/160); j++){
+			// 	uint16_t x = (j % 4) * 160, y = j / 4;
+			// 	for(int i = 0; i < 160; i++){ // 模拟DVP DMA填充RGB数据
+			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = frameCnt + y+x+i/* (((y+x+i)/320)*2-1)*/; // R
+			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = frameCnt - y; // G
+			// 		((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = frameCnt + y; // B
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j+i*3+0;//128; // R
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j+i*3+1;//128 - j; // G
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j+i*3+2;//128 + j; // B
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = j;//128; // R
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = j;//128 - j; // G
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = j;//128 + j; // B
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 0] = 0;//128; // R
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 1] = 0;//128 - j; // G
+			// 		// ((volatile uint8_t*)DVP_bufAddr)[i*3 + 2] = 0;//128 + j; // B
+			// 	}
+			// 	// ((uint16_t*)DVP_bufAddr)[0] = 0x5A5A; // 测试代码
+			// 	// ((uint16_t*)DVP_bufAddr)[1] = j; // j
+			// 	// ((uint16_t*)DVP_bufAddr)[2] = x; // x
+			// 	// ((uint16_t*)DVP_bufAddr)[3] = y; // y
+			// 	// ((uint16_t*)DVP_bufAddr)[(160*3-2)/2] = 0x1616; // 
+			// 	// ((uint16_t*)DVP_bufAddr)[(160*3+0)/2] = 0x2F2F; // 
+			// 	// esp_lcd_panel_draw_bitmap(panel_handle, 0, j, 160, j+1, DVP_bufAddr);
+			// 	esp_lcd_panel_draw_bitmap(panel_handle, x+0, y, x+160, y+1, DVP_bufAddr);
+			// }
 		}
-		// ((uint16_t*)DVP_bufAddr)[0] = 0x5A5A; // 测试代码
-		// ((uint16_t*)DVP_bufAddr)[1] = j; // j
-		// ((uint16_t*)DVP_bufAddr)[2] = x; // x
-		// ((uint16_t*)DVP_bufAddr)[3] = y; // y
-		// ((uint16_t*)DVP_bufAddr)[(160*3-2)/2] = 0x1616; // 
-		// ((uint16_t*)DVP_bufAddr)[(160*3+0)/2] = 0x2F2F; // 
-		// esp_lcd_panel_draw_bitmap(panel_handle, 0, j, 160, j+1, DVP_bufAddr);
-		esp_lcd_panel_draw_bitmap(panel_handle, x+0, y, x+160, y+1, DVP_bufAddr);
-	}
-	vTaskDelay(pdMS_TO_TICKS(40));
-	esp_lcd_rgb_panel_refresh(panel_handle);
+		// esp_lcd_rgb_panel_refresh(panel_handle);
+		vTaskDelay(pdMS_TO_TICKS(1));
 	}
 	// 将这块数据刷新到帧缓存的 (0,0) 到 (10,10) 坐标 外设会自动反复发送
 	// esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, 10, 10, color_data);
