@@ -3,6 +3,7 @@
 
 #include "BasicIO.h"
 
+#include "driver/ledc.h"
 
 // 屏幕尺寸
 #define LCD_H_RES				800
@@ -25,10 +26,20 @@
 #define LCD_PIN_DATA6			GPIO_NUM_6
 #define LCD_PIN_DATA7			GPIO_NUM_7
 
+// 色彩定义
+#define COLOR_K			0x00 // 黑
+#define COLOR_A			0x6E // 灰
+#define COLOR_W			0xFF // 白
+#define COLOR_R			0xE0 // 红
+#define COLOR_G			0x1C // 绿
+#define COLOR_B			0x03 // 蓝
+#define COLOR_Y			0xF8 // 黄
+#define COLOR_C			0x1F // 青
+#define COLOR_M			0xE3 // 品
 
 
-void rgb_main(void);
-
+void init_rgb(void);
+void rgb_test(void);
 
 
 #endif

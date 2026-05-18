@@ -49,7 +49,8 @@ static const char *TAG = "app_main"; // 定义日志标签
 void app_main(void)
 {
 	io_main();
-	rgb_main();
+	init_rgb();
+	rgb_test();
 	while(1){
 		// check_memory();
 		// check_flash();
