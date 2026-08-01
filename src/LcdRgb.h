@@ -5,18 +5,18 @@
 
 #include "driver/ledc.h"
 
-// 屏幕尺寸
+// Screen size
 #define LCD_H_RES				800
 #define LCD_V_RES				480
 #define LCD_FRAME_SIZE			(LCD_H_RES * LCD_V_RES * 1)
 
-// RGB 流控引脚
+// RGB flow control pins
 #define LCD_PIN_PCLK			GPIO_NUM_19
 #define LCD_PIN_DE				GPIO_NUM_13
 #define LCD_PIN_VSYNC			GPIO_NUM_46
 #define LCD_PIN_HSYNC			GPIO_NUM_3
 
-// RGB 数据引脚 (8位或16位)
+// RGB data pins (8-bit or 16-bit)
 #define LCD_PIN_DATA0			GPIO_NUM_18
 #define LCD_PIN_DATA1			GPIO_NUM_8
 #define LCD_PIN_DATA2			GPIO_NUM_15
@@ -26,16 +26,16 @@
 #define LCD_PIN_DATA6			GPIO_NUM_6
 #define LCD_PIN_DATA7			GPIO_NUM_7
 
-// 色彩定义
-#define COLOR_K			0x00 // 黑
-#define COLOR_A			0x6E // 灰
-#define COLOR_W			0xFF // 白
-#define COLOR_R			0xE0 // 红
-#define COLOR_G			0x1C // 绿
-#define COLOR_B			0x03 // 蓝
-#define COLOR_Y			0xF8 // 黄
-#define COLOR_C			0x1F // 青
-#define COLOR_M			0xE3 // 品
+// Color Definition
+#define COLOR_K			0x00 // Black
+#define COLOR_A			0x6E // Gray
+#define COLOR_W			0xFF // White
+#define COLOR_R			0xE0 // Red
+#define COLOR_G			0x1C // Green
+#define COLOR_B			0x03 // Blue
+#define COLOR_Y			0xF8 // Yellow
+#define COLOR_C			0x1F // Cyan
+#define COLOR_M			0xE3 // Magenta
 
 
 void init_rgb(void);

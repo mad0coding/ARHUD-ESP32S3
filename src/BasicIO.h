@@ -4,11 +4,12 @@
 
 
 // GPIO Input
-#define IO_KEY					GPIO_NUM_14
+#define IO_KEY					GPIO_NUM_45
 
 // GPIO Output
-#define IO_LED					GPIO_NUM_21
+#define IO_LED					GPIO_NUM_48
 #define IO_DISP					GPIO_NUM_20
+#define IO_EXRST				GPIO_NUM_14
 
 // ADC Input
 #define ADC_UNIT				ADC_UNIT_1 // unit 1 (can be used with RF)
@@ -23,13 +24,13 @@
 #define PWM_TIMER_LIGHT			LEDC_TIMER_0
 #define PWM_CHANNEL_LIGHT		LEDC_CHANNEL_0
 #define PWM_FREQ_LIGHT			(30000) // 30kHz
-#define PWM_RESOLUTION_LIGHT	LEDC_TIMER_11_BIT // 最大 11 位 (0~2047)
+#define PWM_RESOLUTION_LIGHT	LEDC_TIMER_11_BIT // MAX 11 bits (0~2047)
 // Fan
-#define IO_FAN					GPIO_NUM_45
+#define IO_FAN					GPIO_NUM_40
 #define PWM_TIMER_FAN			LEDC_TIMER_1
 #define PWM_CHANNEL_FAN			LEDC_CHANNEL_1
 #define PWM_FREQ_FAN			(10000) // 10kHz
-#define PWM_RESOLUTION_FAN		LEDC_TIMER_12_BIT // 最大 12 位 (0~4095)
+#define PWM_RESOLUTION_FAN		LEDC_TIMER_12_BIT // MAX 12 bits (0~4095)
 
 
 

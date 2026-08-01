@@ -43,6 +43,16 @@ void init_gpio(void) // GPIO input output init
 		.intr_type = GPIO_INTR_DISABLE,
 	};
 	gpio_config(&io_conf_out_disp);
+
+	// Output EX_RST
+	gpio_config_t io_conf_out_exrst = {
+		.pin_bit_mask = (1ULL << IO_EXRST),
+		.mode = GPIO_MODE_OUTPUT_OD, // mast be open-drain
+		.pull_up_en = GPIO_PULLUP_DISABLE,
+		.pull_down_en = GPIO_PULLDOWN_DISABLE,
+		.intr_type = GPIO_INTR_DISABLE,
+	};
+	gpio_config(&io_conf_out_exrst);
 }
 
 void init_adc(void) // ADC init
