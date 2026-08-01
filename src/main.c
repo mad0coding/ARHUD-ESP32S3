@@ -18,6 +18,9 @@
 #include "LcdRgb.h"
 #include "BasicIO.h"
 
+#include "BLEManager.h"
+#include "imu_app.h"
+
 
 void sys_info(void){
 	printf("ESP-IDF Version: %s\n", esp_get_idf_version()); // Current IDF version 5.5.3
@@ -99,10 +102,19 @@ void check_flash() {
 
 static const char *TAG = "app_main"; // Define log tags
 
+static void on_nav_data_received(const nav_data_t *nav_data)
+{
+	ESP_LOGI(TAG, "Main Application Received Nav Data: Turn Direction = %d, Lane Index = %d, Total Lanes = %d, Distance = %d meters",
+			nav_data->turn_direction,
+			nav_data->lane_index,
+			nav_data->total_lanes,
+			nav_data->distance_to_turn);
+}
+
 void task_core1_function(void *pvParameters)
 {
 	init_rgb();
-	// rgb_test();
+	rgb_test();
 	while(1){
 		ESP_LOGI("TASK_1", "Running. Core ID: %d", xPortGetCoreID());
 		vTaskDelay(pdMS_TO_TICKS(1000));
@@ -112,6 +124,17 @@ void task_core1_function(void *pvParameters)
 void app_main(void)
 {
 	io_main();
+
+	ESP_LOGI(TAG, "IMU app init...");
+	IMU_App_Init(); /* I2C + BMX055 bring-up, gyro calibration, initial attitude */
+	ESP_LOGI(TAG, "IMU app init complete");
+
+	ESP_LOGI(TAG, "BLE Manager init...");
+	BLE_Manager_Init(on_nav_data_received);
+	ESP_LOGI(TAG, "BLE Manager init complete");
+
+	/* Runs IMU_App_Update() at ~200 Hz and logs pitch/roll/yaw every 200 ms. */
+	IMU_App_StartTask(20);
 	
 	xTaskCreatePinnedToCore(
 		task_core1_function, "Task_On_Core1", // task func pointer, task name
