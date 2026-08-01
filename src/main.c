@@ -15,7 +15,6 @@
 static const char *TAG = "MAIN";
 
 #include "BLEManager.h"
-#include "LCD.h"
 
 static void on_nav_data_received(const nav_data_t *nav_data)
 {
@@ -28,11 +27,6 @@ static void on_nav_data_received(const nav_data_t *nav_data)
 
 void app_main(void)
 {
-    ESP_LOGI(TAG, "LCD init...");
-    init_rgb();
-    xTaskCreate((TaskFunction_t)rgb_test, "rgb_test", 4096, NULL, 5, NULL);
-    ESP_LOGI(TAG, "LCD init complete");
-
     ESP_LOGI(TAG, "IMU app init...");
     IMU_App_Init(); /* I2C + BMX055 bring-up, gyro calibration, initial attitude */
     ESP_LOGI(TAG, "IMU app init complete");
