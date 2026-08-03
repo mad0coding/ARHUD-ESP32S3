@@ -15,11 +15,11 @@
 #include "esp_chip_info.h"
 #include "esp_private/esp_clk.h"
 
-#include "LcdRgb.h"
 #include "BasicIO.h"
-
 #include "BLEManager.h"
 #include "imu_app.h"
+#include "LcdRgb.h"
+#include "UI.h"
 
 
 void sys_info(void){
@@ -113,8 +113,6 @@ static void on_nav_data_received(const nav_data_t *nav_data)
 
 void task_core1_function(void *pvParameters)
 {
-	init_rgb();
-	rgb_test();
 	while(1){
 		ESP_LOGI("TASK_1", "Running. Core ID: %d", xPortGetCoreID());
 		vTaskDelay(pdMS_TO_TICKS(1000));
@@ -124,6 +122,11 @@ void task_core1_function(void *pvParameters)
 void app_main(void)
 {
 	io_main();
+
+	xTaskCreatePinnedToCore( // LVGL display task on core1
+		lvgl_task, "LVGL_Task", // task func pointer, task name
+		4096, NULL, 5, NULL, 1 // stack size, task param, priority, task handle, core id
+	);
 
 	ESP_LOGI(TAG, "IMU app init...");
 	IMU_App_Init(); /* I2C + BMX055 bring-up, gyro calibration, initial attitude */
@@ -135,11 +138,6 @@ void app_main(void)
 
 	/* Runs IMU_App_Update() at ~200 Hz and logs pitch/roll/yaw every 200 ms. */
 	IMU_App_StartTask(20);
-	
-	xTaskCreatePinnedToCore(
-		task_core1_function, "Task_On_Core1", // task func pointer, task name
-		3072, NULL, 5, NULL, 1 // stack size, task param, priority, task handle, core id
-	);
 
 	while(1){
 		ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART

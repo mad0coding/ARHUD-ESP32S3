@@ -5,6 +5,12 @@
 
 #include "driver/ledc.h"
 
+// Display size
+#define DISPLAY_W				400
+#define DISPLAY_H				240
+#define OFFSET_X				200
+#define OFFSET_Y				120
+
 // Screen size
 #define LCD_H_RES				800
 #define LCD_V_RES				480

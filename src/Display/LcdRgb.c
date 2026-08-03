@@ -7,10 +7,9 @@
 #include "esp_lcd_panel_rgb.h"
 #include "driver/gpio.h"
 
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
 #include "esp_log.h"
 
+#include "lvgl.h"
 
 esp_lcd_panel_handle_t panel_handle = NULL; // Screen device handle
 
@@ -62,8 +61,8 @@ void init_rgb(void)
 	// Get the addr of the two buffers auto created during driver init.
 	ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, (void**)&LCD_Buf0, (void**)&LCD_Buf1));
 	printf("LCD_Buf0: 0x%lX, LCD_Buf1: 0x%lX\n", (uint32_t)LCD_Buf0, (uint32_t)LCD_Buf1);
-	// memset(LCD_Buf0, 0xE0, LCD_FRAME_SIZE);
-	// memset(LCD_Buf1, 0x1C, LCD_FRAME_SIZE);
+	memset(LCD_Buf0, COLOR_R, LCD_FRAME_SIZE);
+	memset(LCD_Buf1, COLOR_G, LCD_FRAME_SIZE);
 }
 
 // Parameter structure
@@ -210,6 +209,30 @@ void rgb_test(void){
 	// esp_lcd_panel_draw_bitmap(panel_handle, 10, 10, 10, 10, color_data);
 }
 
+void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p){
+	// printf("lvgl_flush_cb: %d,%d\n", area->x1, area->y1);
 
+	// dst pos
+	int32_t x_start = OFFSET_X + area->x1, x_end = OFFSET_X + area->x2 + 1;
+	int32_t y_start = OFFSET_Y + area->y1, y_end = OFFSET_Y + area->y2 + 1;
+	// src size
+	int32_t w = lv_area_get_width(area);
+	int32_t h = lv_area_get_height(area);
+
+	LCD_Buf = (LCD_Buf != LCD_Buf0) ? LCD_Buf0 : LCD_Buf1; // double-buffer pointer switching
+
+	for(int y = 0; y < h; y++){
+		uint8_t *dst_addr = LCD_Buf + ((y_start + y) * LCD_H_RES) + x_start;
+		lv_color_t *src_addr = color_p + (y * w);
+
+		memcpy(dst_addr, src_addr, w * sizeof(lv_color_t));
+	}
+	// There are problems using the esp function below so we just use memcpy above.
+	// esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_p);
+
+	esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, LCD_Buf); // switch
+	
+	lv_disp_flush_ready(disp_drv); // tell LVGL that flush done
+}
 
 
