@@ -21,9 +21,9 @@
 #include "BLEManager.h"
 #include "imu_app.h"
 
-
-void sys_info(void){
-	printf("ESP-IDF Version: %s\n", esp_get_idf_version()); // Current IDF version 5.5.3
+void sys_info(void)
+{
+	printf("ESP-IDF Version: %s\n", esp_get_idf_version());	   // Current IDF version 5.5.3
 	printf("FreeRTOS Tick Freq: %d Hz\n", configTICK_RATE_HZ); // FreeRTOS scheduling cycle
 
 	// chip basic info
@@ -34,31 +34,37 @@ void sys_info(void){
 
 	// Flash size
 	uint32_t flash_size;
-	if (esp_flash_get_size(NULL, &flash_size) == ESP_OK) {
+	if (esp_flash_get_size(NULL, &flash_size) == ESP_OK)
+	{
 		printf("Flash Size: %lu MB\n", flash_size / (1024 * 1024));
 	}
 
 	// PSRAM size
-	if (esp_psram_is_initialized()) {
+	if (esp_psram_is_initialized())
+	{
 		printf("PSRAM Status: ON, Size: %d MB\n", esp_psram_get_size() / (1024 * 1024));
-	} else {
+	}
+	else
+	{
 		printf("PSRAM Status: OFF\n");
 	}
 
 	// --- memory dynamic statistics ---
 	// SRAM
 	size_t free_internal = heap_caps_get_free_size(MALLOC_CAP_INTERNAL);
-	size_t min_internal  = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
+	size_t min_internal = heap_caps_get_minimum_free_size(MALLOC_CAP_INTERNAL);
 	printf("Remaining SRAM: %d B (Historical Min: %d B)\n", free_internal, min_internal);
 
 	// PSRAM
-	if (esp_psram_is_initialized()) {
+	if (esp_psram_is_initialized())
+	{
 		size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
 		printf("Remaining PSRAM: %d B\n", free_psram);
 	}
 }
 
-void efuse_read(void) {
+void efuse_read(void)
+{
 	uint32_t value = 0;
 
 	esp_efuse_read_field_blob(ESP_EFUSE_VDD_SPI_FORCE, &value, 1);
@@ -68,32 +74,38 @@ void efuse_read(void) {
 	printf("VDD_SPI_TIEH: %lu\n", value);
 }
 
-void check_memory() {
+void check_memory()
+{
 	// Check total external memory
 	size_t psram_size = heap_caps_get_total_size(MALLOC_CAP_SPIRAM);
 	size_t free_psram = heap_caps_get_free_size(MALLOC_CAP_SPIRAM);
-	
+
 	printf("PSRAM total size: %d bytes (%d MB)\n", psram_size, psram_size / 1024 / 1024);
 	printf("PSRAM free size: %d bytes\n", free_psram);
 
 	// Test request for a large memory block
-	void* test_ptr = heap_caps_malloc(1024 * 1024 * 2, MALLOC_CAP_SPIRAM); // request 2MB
-	if (test_ptr != NULL) {
+	void *test_ptr = heap_caps_malloc(1024 * 1024 * 2, MALLOC_CAP_SPIRAM); // request 2MB
+	if (test_ptr != NULL)
+	{
 		ESP_LOGI("MEM", "PSRAM malloc succeed.");
 		heap_caps_free(test_ptr);
-	} else {
+	}
+	else
+	{
 		ESP_LOGE("MEM", "PSRAM malloc failed.");
 	}
 }
 
-void check_flash() {
+void check_flash()
+{
 	uint32_t flash_size;
 	esp_flash_get_size(NULL, &flash_size);
 	printf("Flash size: %lu MB\n", flash_size / (1024 * 1024));
-	
+
 	// Print partition table info
 	esp_partition_iterator_t it = esp_partition_find(ESP_PARTITION_TYPE_ANY, ESP_PARTITION_SUBTYPE_ANY, NULL);
-	while (it != NULL) {
+	while (it != NULL)
+	{
 		const esp_partition_t *p = esp_partition_get(it);
 		printf("partition: %s, size: %ld KB\n", p->label, p->size / 1024);
 		it = esp_partition_next(it);
@@ -105,17 +117,18 @@ static const char *TAG = "app_main"; // Define log tags
 static void on_nav_data_received(const nav_data_t *nav_data)
 {
 	ESP_LOGI(TAG, "Main Application Received Nav Data: Turn Direction = %d, Lane Index = %d, Total Lanes = %d, Distance = %d meters",
-			nav_data->turn_direction,
-			nav_data->lane_index,
-			nav_data->total_lanes,
-			nav_data->distance_to_turn);
+			 nav_data->turn_direction,
+			 nav_data->lane_index,
+			 nav_data->total_lanes,
+			 nav_data->distance_to_turn);
 }
 
 void task_core1_function(void *pvParameters)
 {
 	init_rgb();
 	rgb_test();
-	while(1){
+	while (1)
+	{
 		ESP_LOGI("TASK_1", "Running. Core ID: %d", xPortGetCoreID());
 		vTaskDelay(pdMS_TO_TICKS(1000));
 	}
@@ -135,14 +148,20 @@ void app_main(void)
 
 	/* Runs IMU_App_Update() at ~200 Hz and logs pitch/roll/yaw every 200 ms. */
 	IMU_App_StartTask(20);
-	
+
+	/* Periodic BLE send task (1 Hz, 8-byte payload with 10-bit packed pitch/roll/yaw) */
+	xTaskCreate(
+		BLE_Send_Task, "BLE_Send_Task",
+		3072, NULL, 5, NULL);
+
 	xTaskCreatePinnedToCore(
 		task_core1_function, "Task_On_Core1", // task func pointer, task name
-		3072, NULL, 5, NULL, 1 // stack size, task param, priority, task handle, core id
+		3072, NULL, 5, NULL, 1				  // stack size, task param, priority, task handle, core id
 	);
 
-	while(1){
-		ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
+	while (1)
+	{
+		// ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 1000ms
 	}
 }

@@ -2,6 +2,7 @@
 #include <string.h>
 #include "esp_log.h"
 #include "nvs_flash.h"
+#include "imu_app.h"
 
 /* BLE Includes */
 #include "nimble/nimble_port.h"
@@ -15,7 +16,10 @@ static const char *TAG = "BLEManager";
 static ble_nav_data_callback_t g_nav_callback = NULL;
 static uint16_t g_val_handle;
 static uint8_t ble_addr_type;
+static uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+static bool g_is_connected = false;
 
+static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static int ble_gatt_svr_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
 
 // Define UUIDs
@@ -30,7 +34,7 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
             {
                 .uuid = &gatt_svr_chr_uuid.u,
                 .access_cb = ble_gatt_svr_cb,
-                .flags = BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP,
+                .flags = BLE_GATT_CHR_F_READ | BLE_GATT_CHR_F_WRITE | BLE_GATT_CHR_F_WRITE_NO_RSP | BLE_GATT_CHR_F_NOTIFY,
                 .val_handle = &g_val_handle,
             },
             {
@@ -117,6 +121,10 @@ static int ble_gatt_svr_cb(uint16_t conn_handle, uint16_t attr_handle, struct bl
         parse_and_callback_nav_data(buf, len);
         return 0;
     }
+    else if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR)
+    {
+        return 0;
+    }
 
     return BLE_ATT_ERR_UNLIKELY;
 }
@@ -160,7 +168,7 @@ static void ble_app_advertise(void)
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
 
-    rc = ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &adv_params, NULL, NULL);
+    rc = ble_gap_adv_start(ble_addr_type, NULL, BLE_HS_FOREVER, &adv_params, ble_gap_event, NULL);
     if (rc != 0)
     {
         ESP_LOGE(TAG, "Error starting advertisement; rc=%d", rc);
@@ -179,14 +187,23 @@ static int ble_gap_event(struct ble_gap_event *event, void *arg)
         ESP_LOGI(TAG, "BLE Connection %s; status=%d",
                  event->connect.status == 0 ? "established" : "failed",
                  event->connect.status);
-        if (event->connect.status != 0)
+        if (event->connect.status == 0)
         {
+            g_conn_handle = event->connect.conn_handle;
+            g_is_connected = true;
+        }
+        else
+        {
+            g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+            g_is_connected = false;
             ble_app_advertise();
         }
         break;
 
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "BLE Disconnected; reason=%d", event->disconnect.reason);
+        g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
+        g_is_connected = false;
         ble_app_advertise();
         break;
 
@@ -220,6 +237,8 @@ static void ble_on_sync(void)
 void BLE_Manager_Init(ble_nav_data_callback_t callback)
 {
     g_nav_callback = callback;
+    g_is_connected = false;
+    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND)
@@ -267,11 +286,99 @@ void BLE_Manager_Init(ble_nav_data_callback_t callback)
     }
 
     nimble_port_freertos_init(ble_host_task);
+
+    // 1 Hz, 8-byte payload
+    xTaskCreate(BLE_Send_Task, "BLE_Send_Task", 3072, NULL, 5, NULL);
 }
 
 void BLE_Manager_Deinit(void)
 {
     nimble_port_stop();
     g_nav_callback = NULL;
+    g_is_connected = false;
+    g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     ESP_LOGI(TAG, "BLE Manager Deinitialized");
+}
+
+bool BLE_Manager_IsConnected(void)
+{
+    return g_is_connected;
+}
+
+esp_err_t BLE_Manager_SendData(const uint8_t *data, uint16_t len)
+{
+    if (!g_is_connected || g_conn_handle == BLE_HS_CONN_HANDLE_NONE)
+    {
+        ESP_LOGW(TAG, "Cannot send data: BLE master not connected");
+        return ESP_FAIL;
+    }
+
+    if (data == NULL || len == 0)
+    {
+        ESP_LOGW(TAG, "Cannot send data: Invalid data buffer or length");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    struct os_mbuf *om = ble_hs_mbuf_from_flat(data, len);
+    if (om == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to allocate memory buffer for BLE notification");
+        return ESP_ERR_NO_MEM;
+    }
+
+    int rc = ble_gatts_notify_custom(g_conn_handle, g_val_handle, om);
+    if (rc != 0)
+    {
+        ESP_LOGE(TAG, "Failed to send BLE notification; rc=%d", rc);
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Sent %d bytes to BLE master", len);
+    return ESP_OK;
+}
+
+void BLE_Send_Task(void *pvParameters)
+{
+    TickType_t xLastWakeTime = xTaskGetTickCount();
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000);
+
+    while (1)
+    {
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        if (BLE_Manager_IsConnected())
+        {
+            float pitch = IMU_App_GetPitch();
+            float roll = IMU_App_GetRoll();
+            float yaw = IMU_App_GetYaw();
+
+            // Convert pitch, roll, yaw to 10-bit integers (0 to 1023)
+            // 3 angles x 10 bits = 30 bits total packed into 4 bytes
+            uint16_t pitch_10bit = (uint16_t)((int)pitch + 180) & 0x3FF;
+            uint16_t roll_10bit = (uint16_t)((int)roll + 180) & 0x3FF;
+            uint16_t yaw_10bit = (uint16_t)((int)yaw) & 0x3FF;
+
+            // Pack 30 bits into a 32-bit uint32_t container
+            uint32_t packed_30bit = ((uint32_t)pitch_10bit << 20) |
+                                    ((uint32_t)roll_10bit << 10) |
+                                    (uint32_t)yaw_10bit;
+
+            uint8_t payload[8];
+            payload[0] = 0xAA;                                   // Start frame
+            payload[1] = (uint8_t)((packed_30bit >> 24) & 0xFF); // Bits 24..31 (Top 2 bits reserved + Pitch MSBs)
+            payload[2] = (uint8_t)((packed_30bit >> 16) & 0xFF); // Bits 16..23
+            payload[3] = (uint8_t)((packed_30bit >> 8) & 0xFF);  // Bits 8..15
+            payload[4] = (uint8_t)(packed_30bit & 0xFF);         // Bits 0..7
+            payload[5] = 0x00;                                   // Reserved
+            payload[6] = 0x00;                                   // Reserved
+            payload[7] = 0x55;                                   // End frame
+
+            esp_err_t err = BLE_Manager_SendData(payload, sizeof(payload));
+            if (err == ESP_OK)
+            {
+                ESP_LOGI(TAG, "BLE_Send_Task: Sent 8 bytes (10-bit angles packed: P=%d, R=%d, Y=%d)",
+                         (int)pitch, (int)roll, (int)yaw);
+            }
+        }
+    }
 }
