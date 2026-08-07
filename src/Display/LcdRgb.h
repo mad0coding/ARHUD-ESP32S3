@@ -11,6 +11,10 @@
 #define OFFSET_X				200
 #define OFFSET_Y				120
 
+// Mirror config
+#define DISPLAY_MIRROR_X		1
+#define DISPLAY_MIRROR_Y		0
+
 // Screen size
 #define LCD_H_RES				800
 #define LCD_V_RES				480

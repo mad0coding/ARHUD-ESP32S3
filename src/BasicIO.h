@@ -33,6 +33,19 @@
 #define PWM_RESOLUTION_FAN		LEDC_TIMER_12_BIT // MAX 12 bits (0~4095)
 
 
+// Operations
+#define GET_KEY()				(!gpio_get_level(IO_KEY))
+#define SET_LED(x)				gpio_set_level(IO_LED, (x))
+#define SET_DISP(x)				gpio_set_level(IO_DISP, (x))
+#define SET_EXRST(x)			gpio_set_level(IO_EXRST, (x))
+#define SET_PWM_LIGHT(x)		do{ \
+									ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT, (x)); \
+									ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT); \
+								}while(0)
+#define SET_PWM_FAN(x)			do{ \
+									ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_FAN, (x)); \
+									ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_FAN); \
+								}while(0)
 
 
 

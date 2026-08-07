@@ -121,10 +121,14 @@ void io_main(void)
 	init_pwm();
 	init_adc();
 
+	SET_EXRST(0);
+	SET_DISP(0);
+	SET_PWM_LIGHT(0);
+
 	int led_state = 0;
 	int pwm_duty = 0;
 
-	while (0) {
+	while(0){
 		// read key (invert logic)
 		int btn_val = gpio_get_level(IO_KEY);
 		
@@ -152,9 +156,6 @@ void io_main(void)
 
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
-	gpio_set_level(IO_DISP, 1);
-	ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT, 500));
-	ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT));
 }
 
 

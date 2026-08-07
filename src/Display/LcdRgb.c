@@ -61,8 +61,8 @@ void init_rgb(void)
 	// Get the addr of the two buffers auto created during driver init.
 	ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, (void**)&LCD_Buf0, (void**)&LCD_Buf1));
 	printf("LCD_Buf0: 0x%lX, LCD_Buf1: 0x%lX\n", (uint32_t)LCD_Buf0, (uint32_t)LCD_Buf1);
-	memset(LCD_Buf0, COLOR_R, LCD_FRAME_SIZE);
-	memset(LCD_Buf1, COLOR_G, LCD_FRAME_SIZE);
+	// memset(LCD_Buf0, COLOR_R, LCD_FRAME_SIZE);
+	// memset(LCD_Buf1, COLOR_G, LCD_FRAME_SIZE);
 }
 
 // Parameter structure
@@ -223,12 +223,23 @@ void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *c
 
 	for(int y = 0; y < h; y++){
 		uint8_t *dst_addr = LCD_Buf + ((y_start + y) * LCD_H_RES) + x_start;
+#if DISPLAY_MIRROR_Y
+		lv_color_t *src_addr = color_p + ((h - y - 1) * w);
+#else
 		lv_color_t *src_addr = color_p + (y * w);
+#endif
 
+#if DISPLAY_MIRROR_X
+		uint32_t *src32 = (uint32_t *)src_addr;
+		uint32_t *dst32 = (uint32_t *)dst_addr;
+		int32_t w32 = w / 4;
+		for(int x = 0; x < w32; x++){
+			dst32[w32 - 1 - x] = __builtin_bswap32(src32[x]); // 4B alignment is required
+		}
+#else
 		memcpy(dst_addr, src_addr, w * sizeof(lv_color_t));
+#endif
 	}
-	// There are problems using the esp function below so we just use memcpy above.
-	// esp_lcd_panel_draw_bitmap(panel_handle, x_start, y_start, x_end, y_end, color_p);
 
 	esp_lcd_panel_draw_bitmap(panel_handle, 0, 0, LCD_H_RES, LCD_V_RES, LCD_Buf); // switch
 	
