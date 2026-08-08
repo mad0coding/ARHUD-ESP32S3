@@ -60,7 +60,7 @@ void init_rgb(void)
 
 	// Get the addr of the two buffers auto created during driver init.
 	ESP_ERROR_CHECK(esp_lcd_rgb_panel_get_frame_buffer(panel_handle, 2, (void**)&LCD_Buf0, (void**)&LCD_Buf1));
-	printf("LCD_Buf0: 0x%lX, LCD_Buf1: 0x%lX\n", (uint32_t)LCD_Buf0, (uint32_t)LCD_Buf1);
+	// printf("LCD_Buf0: 0x%lX, LCD_Buf1: 0x%lX\n", (uint32_t)LCD_Buf0, (uint32_t)LCD_Buf1);
 	// memset(LCD_Buf0, COLOR_R, LCD_FRAME_SIZE);
 	// memset(LCD_Buf1, COLOR_G, LCD_FRAME_SIZE);
 }
@@ -210,7 +210,7 @@ void rgb_test(void){
 }
 
 void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *color_p){
-	// printf("lvgl_flush_cb: %d,%d\n", area->x1, area->y1);
+	// printf("lvgl_flush_cb: (%d,%d)-(%d,%d)\n", area->x1, area->y1, area->x2, area->y2);
 
 	// dst pos
 	int32_t x_start = OFFSET_X + area->x1, x_end = OFFSET_X + area->x2 + 1;
@@ -218,6 +218,7 @@ void lvgl_flush_cb(lv_disp_drv_t *disp_drv, const lv_area_t *area, lv_color_t *c
 	// src size
 	int32_t w = lv_area_get_width(area);
 	int32_t h = lv_area_get_height(area);
+	// printf("lvgl_flush_cb: %ld,%ld\n", w, h);
 
 	LCD_Buf = (LCD_Buf != LCD_Buf0) ? LCD_Buf0 : LCD_Buf1; // double-buffer pointer switching
 
