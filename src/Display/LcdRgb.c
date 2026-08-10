@@ -49,6 +49,7 @@ void init_rgb(void)
 		.num_fbs = 2, // Request for two buffers
 		.flags.double_fb = 0, // Disable double-buffer auto switch. Manually switch later.
 		.flags.refresh_on_demand = 0, // Do not refresh manually. Use autoc refresh.
+    	.bounce_buffer_size_px = LCD_H_RES * 20, // Use 20 rows' bounce buffer to address PSRAM latency
 	};
 
 	// 2. Install RGB panel driver

@@ -18,6 +18,105 @@ LV_FONT_DECLARE(lv_font_MontserratBold_70);
 LV_FONT_DECLARE(lv_font_MontserratBold_60);
 LV_FONT_DECLARE(lv_font_RobotoBold_50);
 
+// custom img
+LV_IMG_DECLARE(Navigation_Arrow);
+LV_IMG_DECLARE(ic_depart);
+LV_IMG_DECLARE(ic_destination);
+LV_IMG_DECLARE(ic_destination_left);
+LV_IMG_DECLARE(ic_destination_right);
+LV_IMG_DECLARE(ic_merge);
+LV_IMG_DECLARE(ic_straight);
+LV_IMG_DECLARE(ic_turn_left);
+LV_IMG_DECLARE(ic_turn_right);
+LV_IMG_DECLARE(ic_turn_sharp_left);
+LV_IMG_DECLARE(ic_turn_sharp_right);
+LV_IMG_DECLARE(ic_turn_slight_left);
+LV_IMG_DECLARE(ic_turn_slight_right);
+LV_IMG_DECLARE(ic_turn_u_turn_clockwise);
+LV_IMG_DECLARE(ic_turn_u_turn_counterclockwise);
+
+static const void *icon_list[] = {
+	NULL, &ic_turn_u_turn_counterclockwise, &ic_turn_sharp_left, &ic_turn_left, &ic_turn_slight_left,
+	&ic_straight, &ic_turn_slight_right, &ic_turn_right, &ic_turn_sharp_right, &ic_turn_u_turn_clockwise,
+	&ic_destination_left, &ic_destination_right, &ic_destination, &ic_depart, &ic_merge,
+};
+
+// -------------------------------------------------- Navigation Arrow --------------------------------------------------
+#define ARROW_ANIM_TIME		100 // animation time (ms)
+
+typedef struct{
+	lv_obj_t *circle;
+	lv_obj_t *arrow;
+
+	uint8_t visible;
+	bool is_animating; // is animation running
+	lv_anim_t anim; // animation handle
+}navigation_arrow_t;
+navigation_arrow_t navigation_arrow;
+
+static void navigation_arrow_set_angle(int16_t angle){
+	lv_img_set_angle(navigation_arrow.arrow, angle); // unit: 0.1 deg
+}
+
+static void navigation_arrow_set_visible(uint8_t visible){
+	if(visible) lv_obj_clear_flag(navigation_arrow.circle, LV_OBJ_FLAG_HIDDEN);
+	else lv_obj_add_flag(navigation_arrow.circle, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void navigation_arrow_set_visible_anim(uint8_t visible){ // set state with animation
+	if(navigation_arrow.visible == visible || navigation_arrow.is_animating){
+		return;
+	}
+	navigation_arrow.is_animating = true; // animation running
+
+	if(visible) navigation_arrow_set_visible(1); // set visible before animation
+
+	navigation_arrow.anim.user_data = (void *)(uintptr_t)visible; // record
+
+	lv_anim_start(&navigation_arrow.anim); // start
+}
+
+static void arrow_anim_exec_cb(void *var, int32_t v){ // animation execution callback
+	// v: 0 -> 255 = animation progress: 0.0% -> 100.0%
+	int16_t progress = (navigation_arrow.visible == 0) ? v : (255 - v); // visible progress (0 -> 255 = invisible -> visible)
+	lv_obj_set_style_opa(navigation_arrow.circle, progress, LV_PART_MAIN); // set opacity
+}
+
+static void arrow_anim_ready_cb(lv_anim_t *a){ // animation finished callback
+	navigation_arrow.is_animating = false;
+	navigation_arrow.visible = (uint8_t)(uintptr_t)a->user_data;
+	if(!navigation_arrow.visible) navigation_arrow_set_visible(0); // set invisible to save cpu
+}
+
+static void navigation_arrow_create(lv_obj_t *parent){
+	navigation_arrow.circle = lv_obj_create(parent);
+	lv_obj_set_size(navigation_arrow.circle, 171, 171); // size
+	lv_obj_set_pos(navigation_arrow.circle, 115, DISPLAY_H - 171);
+	lv_obj_set_style_bg_color(navigation_arrow.circle, lv_palette_main(LV_PALETTE_NONE), 0); // blue background
+	lv_obj_set_style_radius(navigation_arrow.circle, 86, 0); // rounded corners 1px
+	lv_obj_add_flag(navigation_arrow.circle, LV_OBJ_FLAG_SCROLL_ON_FOCUS); // disable scrolling
+	lv_obj_clear_flag(navigation_arrow.circle, LV_OBJ_FLAG_SCROLLABLE); // turn off scrollbar attribute
+
+	navigation_arrow.arrow = lv_img_create(navigation_arrow.circle); // create img
+	lv_img_set_src(navigation_arrow.arrow, &Navigation_Arrow); // set img source
+	lv_obj_center(navigation_arrow.arrow); // center
+	lv_obj_set_style_img_recolor(navigation_arrow.arrow, lv_color_make(0x00, 0x40, 0xFF), LV_PART_MAIN); // set color
+	lv_obj_set_style_img_recolor_opa(navigation_arrow.arrow, LV_OPA_COVER, LV_PART_MAIN); // set opacity
+
+	navigation_arrow_set_visible(0); // hide
+
+	// create animation
+	lv_anim_init(&navigation_arrow.anim);
+	lv_anim_set_var(&navigation_arrow.anim, &navigation_arrow);
+	lv_anim_set_values(&navigation_arrow.anim, 0, 255);
+	lv_anim_set_time(&navigation_arrow.anim, ARROW_ANIM_TIME);
+	lv_anim_set_exec_cb(&navigation_arrow.anim, arrow_anim_exec_cb);
+	lv_anim_set_ready_cb(&navigation_arrow.anim, arrow_anim_ready_cb);
+	lv_anim_set_path_cb(&navigation_arrow.anim, lv_anim_path_ease_in_out);
+	navigation_arrow.is_animating = false;
+}
+// ----------------------------------------------------------------------------------------------------
+
 // -------------------------------------------------- Speed Limit Sign --------------------------------------------------
 typedef struct{
 	lv_obj_t *out_circle; // Outer circle (as the parent object)
@@ -117,7 +216,7 @@ static void lane_indicator_create(lv_obj_t *parent){
 
 // -------------------------------------------------- Speed Display --------------------------------------------------
 // parameters
-#define ANIM_TIME_MS		100 // animation time (ms)
+#define SPEED_ANIM_TIME		100 // animation time (ms)
 
 #define STATE0_SPEED_X		(0)
 #define STATE0_SPEED_Y		(120 - 35)
@@ -167,6 +266,9 @@ static void speed_display_set_state_anim(uint8_t target_state){ // set state wit
 	speed_display.anim.user_data = (void *)(uintptr_t)target_state; // record target state
 
 	lv_anim_start(&speed_display.anim); // start
+
+	// navigation_arrow_set_visible(target_state);
+	navigation_arrow_set_visible_anim(target_state);
 }
 
 static void speed_anim_exec_cb(void *var, int32_t v){ // animation execution callback
@@ -221,7 +323,7 @@ static void speed_display_create(lv_obj_t *parent){
 	lv_anim_init(&speed_display.anim);
 	lv_anim_set_var(&speed_display.anim, &speed_display);
 	lv_anim_set_values(&speed_display.anim, 0, 1000);
-	lv_anim_set_time(&speed_display.anim, ANIM_TIME_MS);
+	lv_anim_set_time(&speed_display.anim, SPEED_ANIM_TIME);
 	lv_anim_set_exec_cb(&speed_display.anim, speed_anim_exec_cb);
 	lv_anim_set_ready_cb(&speed_display.anim, speed_anim_ready_cb);
 	lv_anim_set_path_cb(&speed_display.anim, lv_anim_path_ease_in_out);
@@ -229,7 +331,54 @@ static void speed_display_create(lv_obj_t *parent){
 }
 // ----------------------------------------------------------------------------------------------------
 
-// --------------------------------------------------  --------------------------------------------------
+// -------------------------------------------------- Navigation Sign --------------------------------------------------
+typedef struct{
+	lv_obj_t *block;
+	lv_obj_t *sign;
+	lv_obj_t *dist;
+}navigation_sign_t;
+static navigation_sign_t navigation_sign;
+
+static void navigation_sign_set_sign(uint8_t sign){
+	if(!sign || sign >= (sizeof(icon_list) / sizeof(icon_list[0]))){ // not in range
+		lv_obj_add_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN); // hide
+	}
+	else{
+		lv_obj_clear_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
+		lv_img_set_src(navigation_sign.sign, icon_list[sign]); // set img source
+	}
+}
+
+static void navigation_sign_set_visible(uint8_t visible){
+	// if(visible) lv_obj_clear_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
+	// else lv_obj_add_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
+}
+
+static void navigation_sign_create(lv_obj_t *parent){
+	navigation_sign.block = lv_obj_create(parent);
+	lv_obj_set_size(navigation_sign.block, 100, 100); // size
+	lv_obj_set_pos(navigation_sign.block, DISPLAY_W - 100, 0);
+	lv_obj_set_style_bg_color(navigation_sign.block, lv_palette_main(LV_PALETTE_NONE), 0); // background
+	lv_obj_set_style_radius(navigation_sign.block, 1, 0); // rounded corners 1px
+	lv_obj_add_flag(navigation_sign.block, LV_OBJ_FLAG_SCROLL_ON_FOCUS); // disable scrolling
+	lv_obj_clear_flag(navigation_sign.block, LV_OBJ_FLAG_SCROLLABLE); // turn off scrollbar attribute
+
+	navigation_sign.sign = lv_img_create(navigation_sign.block); // create img
+	navigation_sign_set_sign(0); // set img source
+	lv_obj_center(navigation_sign.sign); // center
+	lv_obj_set_style_img_recolor(navigation_sign.sign, lv_color_make(0x00, 0xFF, 0xFF), LV_PART_MAIN); // set color
+	lv_obj_set_style_img_recolor_opa(navigation_sign.sign, LV_OPA_COVER, LV_PART_MAIN); // set opacity
+
+	navigation_sign.dist = lv_label_create(parent);
+	lv_obj_set_style_text_color(navigation_sign.dist, lv_color_make(0x00, 0xFF, 0xFF), 0);
+	lv_obj_set_style_text_font(navigation_sign.dist, &lv_font_RobotoBold_50, 0);
+	lv_obj_set_pos(navigation_sign.dist, DISPLAY_W - 140, 100);
+	lv_label_set_text(navigation_sign.dist, "233m");
+	lv_obj_set_style_text_letter_space(navigation_sign.dist, -5, LV_PART_MAIN); // neg spacing
+	lv_obj_set_style_text_line_space(navigation_sign.dist, -20, LV_PART_MAIN);
+	lv_obj_set_width(navigation_sign.dist, 140); // text width
+	lv_obj_set_style_text_align(navigation_sign.dist, LV_TEXT_ALIGN_RIGHT, 0); // right align
+}
 // ----------------------------------------------------------------------------------------------------
 
 static lv_color_t lvgl_buf[DISPLAY_W * DISPLAY_H];
@@ -254,7 +403,7 @@ static void lvgl_init(void){ // LVGL buf and driver init
 }
 
 static void lvgl_ui_init(void){
-	// get active screen
+	// get current active screen
 	lv_obj_t *scr = lv_scr_act();
 
 	// ensure screen limits the display area
@@ -264,21 +413,11 @@ static void lvgl_ui_init(void){
 	// black background
 	lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
 
-	// 1. Create a background color block (Container/Base Object)
-	lv_obj_t *bg_card = lv_obj_create(scr); // create on the current active screen
-	lv_obj_set_size(bg_card, 100, 100); // size
-	lv_obj_set_pos(bg_card, DISPLAY_W - 100, 0);
-	lv_obj_set_style_bg_color(bg_card, lv_palette_main(LV_PALETTE_NONE), 0); // blue background
-	lv_obj_set_style_radius(bg_card, 1, 0); // rounded corners 1px
+	// create navigation sign
+	navigation_sign_create(scr);
 
-	lv_obj_t *label_meter = lv_label_create(scr);
-	lv_obj_set_style_text_color(label_meter, lv_color_make(0x00, 0xFF, 0xFF), 0);
-	lv_obj_set_style_text_font(label_meter, &lv_font_RobotoBold_50, 0);
-	lv_obj_set_pos(label_meter, DISPLAY_W - 140, 100);
-	lv_label_set_text(label_meter, "2333m");
-	lv_obj_set_style_text_letter_space(label_meter, -5, LV_PART_MAIN); // neg spacing
-	lv_obj_set_width(label_meter, 140); // text width
-	lv_obj_set_style_text_align(label_meter, LV_TEXT_ALIGN_RIGHT, 0); // right align
+	// create navigation arrow
+	navigation_arrow_create(scr);
 
 	// create speed display
 	speed_display_create(scr);
@@ -291,13 +430,14 @@ static void lvgl_ui_init(void){
 }
 
 void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
+	SET_DISP(1); // enable screen first so it can receive RGB data before turning on backlight
 	init_rgb(); // init RGB interface
 
 	lvgl_init(); // LVGL init
 	lvgl_ui_init(); // UI init
 
-	SET_DISP(1); // Enable screen
-	SET_PWM_LIGHT(100); // Set backlight PWM
+	vTaskDelay(pdMS_TO_TICKS(150)); // wait for the screen to be stable (ready)
+	SET_PWM_LIGHT(1000); // set backlight PWM
 
 	while(1){
 		uint32_t time_till_next = lv_timer_handler(); // Let LVGL handle rendering and timers
@@ -305,6 +445,8 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 		if(time_till_next > 30) time_till_next = 30; // MAX
 		else if(time_till_next < 5) time_till_next = 5; // MIN
 		vTaskDelay(pdMS_TO_TICKS(time_till_next)); // wait for next rendering
+
+		navigation_arrow_set_angle(lv_tick_get() % 3600);
 
 		static uint8_t key_old = 0; // key old state
 		static uint8_t cnt = 0;
@@ -317,6 +459,7 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 				// speed_limit_sign_set_visible(cnt % 2);
 				// speed_display_set_state(cnt % 2);
 				speed_display_set_state_anim(cnt % 2);
+				navigation_sign_set_sign(cnt % 15);
 				// lv_obj_t *bg_card = lv_obj_create(lv_scr_act());
 				// lv_obj_set_size(bg_card, 20, 20);
 				// lv_obj_set_pos(bg_card, cnt*20, cnt*20);
