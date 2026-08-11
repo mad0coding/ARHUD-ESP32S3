@@ -18,6 +18,13 @@ LV_FONT_DECLARE(lv_font_MontserratBold_70);
 LV_FONT_DECLARE(lv_font_MontserratBold_60);
 LV_FONT_DECLARE(lv_font_RobotoBold_50);
 
+static const void *font_list[] = {
+	&lv_font_MontserratBold_150, &lv_font_MontserratBold_140, &lv_font_MontserratBold_130, &lv_font_MontserratBold_120,
+	&lv_font_MontserratBold_110, &lv_font_MontserratBold_100, &lv_font_MontserratBold_90, &lv_font_MontserratBold_80,
+	&lv_font_MontserratBold_70, &lv_font_MontserratBold_60,
+	&lv_font_RobotoBold_50,
+};
+
 // custom img
 LV_IMG_DECLARE(Navigation_Arrow);
 LV_IMG_DECLARE(ic_depart);
@@ -42,7 +49,7 @@ static const void *icon_list[] = {
 };
 
 // -------------------------------------------------- Navigation Arrow --------------------------------------------------
-#define ARROW_ANIM_TIME		100 // animation time (ms)
+#define ARROW_ANIM_TIME		150 // animation time (ms)
 
 typedef struct{
 	lv_obj_t *circle;
@@ -91,7 +98,7 @@ static void arrow_anim_ready_cb(lv_anim_t *a){ // animation finished callback
 static void navigation_arrow_create(lv_obj_t *parent){
 	navigation_arrow.circle = lv_obj_create(parent);
 	lv_obj_set_size(navigation_arrow.circle, 171, 171); // size
-	lv_obj_set_pos(navigation_arrow.circle, 115, DISPLAY_H - 171);
+	lv_obj_set_pos(navigation_arrow.circle, DISPLAY_W/2 - 86, DISPLAY_H - 171);
 	lv_obj_set_style_bg_color(navigation_arrow.circle, lv_palette_main(LV_PALETTE_NONE), 0); // blue background
 	lv_obj_set_style_radius(navigation_arrow.circle, 86, 0); // rounded corners 1px
 	lv_obj_add_flag(navigation_arrow.circle, LV_OBJ_FLAG_SCROLL_ON_FOCUS); // disable scrolling
@@ -139,12 +146,12 @@ static void speed_limit_sign_set_value(int16_t new_value){
 	old_value = new_value;
 }
 
-static void speed_limit_sign_create(lv_obj_t *parent, lv_coord_t x, lv_coord_t y){
+static void speed_limit_sign_create(lv_obj_t *parent){
 	// 1. Outer circle (as the parent object)
 	speed_limit_sign.out_circle = lv_obj_create(parent);
 	lv_obj_remove_style_all(speed_limit_sign.out_circle);
 	lv_obj_set_size(speed_limit_sign.out_circle, 100, 100); // diameter
-	lv_obj_set_pos(speed_limit_sign.out_circle, x, y);
+	lv_obj_set_pos(speed_limit_sign.out_circle, 0, 0); // upper right corner
 	lv_obj_set_style_bg_color(speed_limit_sign.out_circle, lv_color_hex(0xFF0000), LV_STATE_DEFAULT); // red
 	lv_obj_set_style_bg_opa(speed_limit_sign.out_circle, LV_OPA_COVER, LV_STATE_DEFAULT);
 	lv_obj_set_style_radius(speed_limit_sign.out_circle, LV_RADIUS_CIRCLE, LV_STATE_DEFAULT);
@@ -216,13 +223,13 @@ static void lane_indicator_create(lv_obj_t *parent){
 
 // -------------------------------------------------- Speed Display --------------------------------------------------
 // parameters
-#define SPEED_ANIM_TIME		100 // animation time (ms)
+#define SPEED_ANIM_TIME		150 // animation time (ms)
 
-#define STATE0_SPEED_X		(0)
+#define STATE0_SPEED_X		(-40 + 10)
 #define STATE0_SPEED_Y		(120 - 35)
-#define STATE0_UNIT_X		(270)
+#define STATE0_UNIT_X		(270 + 5)
 #define STATE0_UNIT_Y		(120 + 40)
-#define STATE1_SPEED_X		(-160)
+#define STATE1_SPEED_X		(-200 + 5)
 #define STATE1_SPEED_Y		(240 - 60 - 60)
 #define STATE1_UNIT_X		(20)
 #define STATE1_UNIT_Y		(240 - 60)
@@ -238,7 +245,8 @@ typedef struct{
 static speed_display_t speed_display;
 
 static void speed_display_set_value(int16_t value){ // set value
-	lv_label_set_text_fmt(speed_display.label_speed, "%d", value);
+	if(value < 0) lv_label_set_text(speed_display.label_speed, "---");
+	else lv_label_set_text_fmt(speed_display.label_speed, "%d", value);
 }
 
 static void speed_display_set_state(uint8_t state){ // set state without animation
@@ -276,16 +284,8 @@ static void speed_anim_exec_cb(void *var, int32_t v){ // animation execution cal
 	int16_t progress = (speed_display.state == 0) ? v : (1000 - v); // state progress (0 -> 1000 = state0 -> state1)
 
 	// speed label font switching (10 stages)
-	if(progress < 100) lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_150, 0);
-	else if(progress < 200)lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_140, 0);
-	else if(progress < 300)lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_130, 0);
-	else if(progress < 400)lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_120, 0);
-	else if(progress < 500)lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_110, 0);
-	else if(progress < 600)lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_100, 0);
-	else if(progress < 700) lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_90, 0);
-	else if(progress < 800) lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_80, 0);
-	else if(progress < 900) lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_70, 0);
-	else lv_obj_set_style_text_font(speed_display.label_speed, &lv_font_MontserratBold_60, 0);
+	uint8_t font_idx = (progress >= 1000) ? 9 : (progress / 100); // range: [0, 9]
+	lv_obj_set_style_text_font(speed_display.label_speed, font_list[font_idx], 0); // set font
 
 	// speed label movement
 	int32_t speed_x = STATE0_SPEED_X + (STATE1_SPEED_X - STATE0_SPEED_X) * progress / 1000;
@@ -307,7 +307,7 @@ static void speed_display_create(lv_obj_t *parent){
 	// create label_speed
 	speed_display.label_speed = lv_label_create(parent);
 	lv_obj_set_style_text_color(speed_display.label_speed, lv_color_make(0x00, 0xFF, 0x00), 0);
-	lv_obj_set_width(speed_display.label_speed, 260);
+	lv_obj_set_width(speed_display.label_speed, 300);
 	lv_obj_set_style_text_align(speed_display.label_speed, LV_TEXT_ALIGN_RIGHT, 0);
 
 	// create label_unit
@@ -316,7 +316,7 @@ static void speed_display_create(lv_obj_t *parent){
 	lv_obj_set_style_text_font(speed_display.label_unit, &lv_font_RobotoBold_50, 0);
 	lv_label_set_text(speed_display.label_unit, "kph");
 
-	speed_display_set_value(123); // defalut value for label_speed
+	speed_display_set_value(-1); // defalut value for label_speed
 	speed_display_set_state(0); // defalut state0
 
 	// create animation
@@ -413,20 +413,15 @@ static void lvgl_ui_init(void){
 	// black background
 	lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
 
-	// create navigation sign
-	navigation_sign_create(scr);
+	navigation_arrow_create(scr); // create navigation arrow
 
-	// create navigation arrow
-	navigation_arrow_create(scr);
+	navigation_sign_create(scr); // create navigation sign
 
-	// create speed display
-	speed_display_create(scr);
+	speed_display_create(scr); // create speed display
 
-	// create speed limit sign in the upper right corner
-	speed_limit_sign_create(scr, 0, 0);
+	speed_limit_sign_create(scr); // create speed limit sign in the upper right corner
 
-	// create lane indicator at the top center
-	lane_indicator_create(scr);
+	lane_indicator_create(scr); // create lane indicator at the top center
 }
 
 void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
@@ -447,6 +442,7 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 		vTaskDelay(pdMS_TO_TICKS(time_till_next)); // wait for next rendering
 
 		navigation_arrow_set_angle(lv_tick_get() % 3600);
+		speed_display_set_value(lv_tick_get() / 500 % 201);
 
 		static uint8_t key_old = 0; // key old state
 		static uint8_t cnt = 0;
@@ -460,11 +456,6 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 				// speed_display_set_state(cnt % 2);
 				speed_display_set_state_anim(cnt % 2);
 				navigation_sign_set_sign(cnt % 15);
-				// lv_obj_t *bg_card = lv_obj_create(lv_scr_act());
-				// lv_obj_set_size(bg_card, 20, 20);
-				// lv_obj_set_pos(bg_card, cnt*20, cnt*20);
-				// lv_obj_set_style_bg_color(bg_card, lv_palette_main(LV_PALETTE_BLUE), 0);
-				// lv_obj_set_style_radius(bg_card, 10, 0);
 				cnt++;
 			}
 		}
