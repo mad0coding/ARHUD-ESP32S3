@@ -137,13 +137,16 @@ static void speed_limit_sign_set_visible(uint8_t visible){
 	else lv_obj_add_flag(speed_limit_sign.out_circle, LV_OBJ_FLAG_HIDDEN);
 }
 
-static void speed_limit_sign_set_value(int16_t new_value){
-	static int16_t old_value = 100;
-	lv_label_set_text_fmt(speed_limit_sign.label, "%d", new_value); // set value
-	if(new_value < 100) lv_obj_set_style_text_letter_space(speed_limit_sign.label, 0, LV_PART_MAIN);
+static void speed_limit_sign_set_value(int16_t value){
+	lv_label_set_text_fmt(speed_limit_sign.label, "%d", value); // set value
+	if(value <= 0){
+		speed_limit_sign_set_visible(0); // hide
+		return;
+	}
+	speed_limit_sign_set_visible(1); // show
+	if(value < 100) lv_obj_set_style_text_letter_space(speed_limit_sign.label, 0, LV_PART_MAIN);
 	else lv_obj_set_style_text_letter_space(speed_limit_sign.label, -5, LV_PART_MAIN); // neg spacing for 3-digit num
-	if((old_value < 100) ^ (new_value < 100)) lv_obj_center(speed_limit_sign.label); // re-center
-	old_value = new_value;
+	lv_obj_align(speed_limit_sign.label, LV_ALIGN_CENTER, 0, 2); // centered with Y offset 0pix
 }
 
 static void speed_limit_sign_create(lv_obj_t *parent){
@@ -172,6 +175,8 @@ static void speed_limit_sign_create(lv_obj_t *parent){
 	lv_obj_set_style_text_color(speed_limit_sign.label, lv_color_hex(0x000000), LV_STATE_DEFAULT);
 	lv_obj_set_style_text_font(speed_limit_sign.label, &lv_font_RobotoBold_50, LV_STATE_DEFAULT); // font
 	speed_limit_sign_set_value(10); // set value
+
+	speed_limit_sign_set_value(-1); // hide
 }
 // ----------------------------------------------------------------------------------------------------
 
@@ -182,6 +187,31 @@ typedef struct{
 	lv_obj_t *labels[3]; // 3 num labels
 }lane_indicator_t;
 lane_indicator_t lane_indicator;
+
+static void lane_indicator_set_data(uint8_t *data){
+	uint8_t label_num[3] = {data[0] & 0x3F, data[1] & 0x3F, data[2] & 0x3F};
+	uint8_t label_state[3] = {(data[0] & 0xC0) >> 6, (data[1] & 0xC0) >> 6, (data[2] & 0xC0) >> 6};
+	uint8_t line_visible[4] = {
+		label_state[0], label_state[0] | label_state[1],
+		label_state[1] | label_state[2], label_state[2],
+	};
+	for(uint8_t i = 0; i < 4; i++){
+		if(line_visible[i]) lv_obj_clear_flag(lane_indicator.lines[i], LV_OBJ_FLAG_HIDDEN);
+		else lv_obj_add_flag(lane_indicator.lines[i], LV_OBJ_FLAG_HIDDEN);
+	}
+	for(uint8_t i = 0; i < 3; i++){
+		if(label_state[i]) lv_obj_clear_flag(lane_indicator.labels[i], LV_OBJ_FLAG_HIDDEN);
+		else lv_obj_add_flag(lane_indicator.labels[i], LV_OBJ_FLAG_HIDDEN);
+		if(label_state[i] == 1){
+			lv_obj_set_style_text_color(lane_indicator.labels[i], lv_color_hex(0x00FF00), LV_STATE_DEFAULT); // green
+		}else if(label_state[i] == 2){
+			lv_obj_set_style_text_color(lane_indicator.labels[i], lv_color_hex(0xFF0000), LV_STATE_DEFAULT); // red
+		}else{
+			lv_obj_set_style_text_color(lane_indicator.labels[i], lv_color_hex(0xFFFFFF), LV_STATE_DEFAULT); // white
+		}
+		lv_label_set_text_fmt(lane_indicator.labels[i], "%X", label_num[i]); // set number
+	}
+}
 
 static void lane_indicator_create(lv_obj_t *parent){
 	// size parameters
@@ -198,12 +228,11 @@ static void lane_indicator_create(lv_obj_t *parent){
 	lv_obj_set_style_bg_opa(lane_indicator.container, LV_OPA_TRANSP, LV_STATE_DEFAULT); // transparent
 
 	// 2. create 4 lines
-	for (int i = 0; i < 4; i++) {
+	for(int i = 0; i < 4; i++){
 		lane_indicator.lines[i] = lv_obj_create(lane_indicator.container);
 		lv_obj_remove_style_all(lane_indicator.lines[i]);
 		lv_obj_set_size(lane_indicator.lines[i], line_w, line_h);
 		lv_obj_set_pos(lane_indicator.lines[i], i * (line_w + spacing), 0);
-		lv_obj_set_style_bg_color(lane_indicator.lines[i], lv_color_hex(0xFFFFFF), LV_STATE_DEFAULT); // white
 		lv_obj_set_style_bg_opa(lane_indicator.lines[i], LV_OPA_COVER, LV_STATE_DEFAULT);
 		lv_obj_set_style_border_width(lane_indicator.lines[i], 0, LV_STATE_DEFAULT);
 	}
@@ -211,13 +240,15 @@ static void lane_indicator_create(lv_obj_t *parent){
 	// 3. create 3 number labels (between lines)
 	for(int i = 0; i < 3; i++){
 		lane_indicator.labels[i] = lv_label_create(lane_indicator.container);
-		lv_obj_set_style_text_color(lane_indicator.labels[i], lv_color_hex(0xFFFFFF), LV_STATE_DEFAULT); // white
 		lv_obj_set_style_text_font(lane_indicator.labels[i], &lv_font_RobotoBold_50, LV_STATE_DEFAULT); // font
 		lv_label_set_text_fmt(lane_indicator.labels[i], "%d", i + 1); // default number
 		
 		int x_pos = i * (line_w + spacing) + line_w + 5; // x position (between line i and i+1)
 		lv_obj_set_pos(lane_indicator.labels[i], x_pos, 0);
 	}
+
+	uint8_t data[3] = {0, 0, 0};
+	lane_indicator_set_data(data); // hide all
 }
 // ----------------------------------------------------------------------------------------------------
 
@@ -229,9 +260,9 @@ static void lane_indicator_create(lv_obj_t *parent){
 #define STATE0_SPEED_Y		(120 - 35)
 #define STATE0_UNIT_X		(270 + 5)
 #define STATE0_UNIT_Y		(120 + 40)
-#define STATE1_SPEED_X		(-200 + 5)
+#define STATE1_SPEED_X		(-200 + 11)
 #define STATE1_SPEED_Y		(240 - 60 - 60)
-#define STATE1_UNIT_X		(20)
+#define STATE1_UNIT_X		(20 + 5)
 #define STATE1_UNIT_Y		(240 - 60)
 
 typedef struct{
@@ -339,19 +370,30 @@ typedef struct{
 }navigation_sign_t;
 static navigation_sign_t navigation_sign;
 
-static void navigation_sign_set_sign(uint8_t sign){
-	if(!sign || sign >= (sizeof(icon_list) / sizeof(icon_list[0]))){ // not in range
-		lv_obj_add_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN); // hide
+static void navigation_sign_set_visible(uint8_t visible){
+	if(visible){
+		lv_obj_clear_flag(navigation_sign.block, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_clear_flag(navigation_sign.dist, LV_OBJ_FLAG_HIDDEN);
 	}
 	else{
-		lv_obj_clear_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(navigation_sign.block, LV_OBJ_FLAG_HIDDEN);
+		lv_obj_add_flag(navigation_sign.dist, LV_OBJ_FLAG_HIDDEN);
+	}
+}
+
+static void navigation_sign_set_sign(uint8_t sign){
+	if(!sign || sign >= (sizeof(icon_list) / sizeof(icon_list[0]))){ // not in range
+		navigation_sign_set_visible(0); // hide
+	}
+	else{
+		navigation_sign_set_visible(1); // show
 		lv_img_set_src(navigation_sign.sign, icon_list[sign]); // set img source
 	}
 }
 
-static void navigation_sign_set_visible(uint8_t visible){
-	// if(visible) lv_obj_clear_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
-	// else lv_obj_add_flag(navigation_sign.sign, LV_OBJ_FLAG_HIDDEN);
+static void navigation_sign_set_dist(uint16_t dist){ // set distance data
+	if(!(dist & 0x8000)) lv_label_set_text_fmt(navigation_sign.dist, "%dm", dist);
+	else lv_label_set_text_fmt(navigation_sign.dist, "%dkm", (dist & 0x7FFF));
 }
 
 static void navigation_sign_create(lv_obj_t *parent){
@@ -360,24 +402,26 @@ static void navigation_sign_create(lv_obj_t *parent){
 	lv_obj_set_pos(navigation_sign.block, DISPLAY_W - 100, 0);
 	lv_obj_set_style_bg_color(navigation_sign.block, lv_palette_main(LV_PALETTE_NONE), 0); // background
 	lv_obj_set_style_radius(navigation_sign.block, 1, 0); // rounded corners 1px
+	lv_obj_set_style_border_color(navigation_sign.block, lv_color_hex(0x00FFFF), LV_PART_MAIN);
 	lv_obj_add_flag(navigation_sign.block, LV_OBJ_FLAG_SCROLL_ON_FOCUS); // disable scrolling
 	lv_obj_clear_flag(navigation_sign.block, LV_OBJ_FLAG_SCROLLABLE); // turn off scrollbar attribute
 
 	navigation_sign.sign = lv_img_create(navigation_sign.block); // create img
-	navigation_sign_set_sign(0); // set img source
 	lv_obj_center(navigation_sign.sign); // center
-	lv_obj_set_style_img_recolor(navigation_sign.sign, lv_color_make(0x00, 0xFF, 0xFF), LV_PART_MAIN); // set color
+	lv_obj_set_style_img_recolor(navigation_sign.sign, lv_color_hex(0x00FFFF), LV_PART_MAIN); // set color
 	lv_obj_set_style_img_recolor_opa(navigation_sign.sign, LV_OPA_COVER, LV_PART_MAIN); // set opacity
 
 	navigation_sign.dist = lv_label_create(parent);
-	lv_obj_set_style_text_color(navigation_sign.dist, lv_color_make(0x00, 0xFF, 0xFF), 0);
+	lv_obj_set_style_text_color(navigation_sign.dist, lv_color_hex(0x00FFFF), 0);
 	lv_obj_set_style_text_font(navigation_sign.dist, &lv_font_RobotoBold_50, 0);
 	lv_obj_set_pos(navigation_sign.dist, DISPLAY_W - 140, 100);
-	lv_label_set_text(navigation_sign.dist, "233m");
 	lv_obj_set_style_text_letter_space(navigation_sign.dist, -5, LV_PART_MAIN); // neg spacing
 	lv_obj_set_style_text_line_space(navigation_sign.dist, -20, LV_PART_MAIN);
 	lv_obj_set_width(navigation_sign.dist, 140); // text width
 	lv_obj_set_style_text_align(navigation_sign.dist, LV_TEXT_ALIGN_RIGHT, 0); // right align
+
+	navigation_sign_set_dist(0); // set distance data
+	navigation_sign_set_sign(0); // hide
 }
 // ----------------------------------------------------------------------------------------------------
 
@@ -456,6 +500,9 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 				// speed_display_set_state(cnt % 2);
 				speed_display_set_state_anim(cnt % 2);
 				navigation_sign_set_sign(cnt % 15);
+
+				uint8_t data[3] = {0x47, 0x88, 0xC9};
+				lane_indicator_set_data(data);
 				cnt++;
 			}
 		}
