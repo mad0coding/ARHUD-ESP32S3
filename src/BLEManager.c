@@ -13,11 +13,13 @@
 #include "services/gatt/ble_svc_gatt.h"
 
 static const char *TAG = "BLEManager";
-static ble_nav_data_callback_t g_nav_callback = NULL;
 static uint16_t g_val_handle;
 static uint8_t ble_addr_type;
 static uint16_t g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 static bool g_is_connected = false;
+
+static uint8_t g_raw_data[BLE_MAX_RAW_DATA_LEN];
+static uint16_t g_raw_data_len = 0;
 
 static int ble_gap_event(struct ble_gap_event *event, void *arg);
 static int ble_gatt_svr_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg);
@@ -46,79 +48,28 @@ static const struct ble_gatt_svc_def gatt_svr_svcs[] = {
     },
 };
 
-static uint8_t compute_checksum(const uint8_t *data, int len, int start_index)
-{
-    uint8_t xor_val = 0;
-    for (int i = start_index; i < len; ++i)
-    {
-        xor_val ^= data[i];
-    }
-    return xor_val;
-}
-
-static void parse_and_callback_nav_data(const uint8_t *data, int len)
-{
-    // Minimum packet size: [0] AA, [1] Cmd, [2] Turn, [3] Lane, [4] Total Lanes, [5] Dist High, [6] Dist Low, [7] Checksum
-    if (len < 8)
-    {
-        ESP_LOGW(TAG, "Received packet too short: %d bytes", len);
-        return;
-    }
-
-    if (data[0] != 0xAA)
-    {
-        ESP_LOGW(TAG, "Header byte incorrect: 0x%02X", data[0]);
-        return;
-    }
-
-    if (data[1] != 0x01)
-    {
-        ESP_LOGW(TAG, "Unknown command type: 0x%02X", data[1]);
-        return;
-    }
-
-    uint8_t rx_checksum = data[7];
-    uint8_t calc_checksum = compute_checksum(data, 7, 1);
-    if (rx_checksum != calc_checksum)
-    {
-        ESP_LOGE(TAG, "Checksum mismatch! Rx: 0x%02X, Calc: 0x%02X", rx_checksum, calc_checksum);
-        return;
-    }
-
-    nav_data_t nav_data;
-    nav_data.turn_direction = data[2];
-    nav_data.lane_index = data[3];
-    nav_data.total_lanes = data[4];
-    nav_data.distance_to_turn = ((uint16_t)data[5] << 8) | data[6];
-
-    ESP_LOGI(TAG, "Parsed Nav Data: Turn=%d, Lane=%d/%d, Distance=%d m",
-             nav_data.turn_direction, nav_data.lane_index, nav_data.total_lanes, nav_data.distance_to_turn);
-
-    if (g_nav_callback != NULL)
-    {
-        g_nav_callback(&nav_data);
-    }
-}
-
 static int ble_gatt_svr_cb(uint16_t conn_handle, uint16_t attr_handle, struct ble_gatt_access_ctxt *ctxt, void *arg)
 {
     if (ctxt->op == BLE_GATT_ACCESS_OP_WRITE_CHR)
     {
         uint16_t len = OS_MBUF_PKTLEN(ctxt->om);
-        uint8_t buf[32];
-        if (len > sizeof(buf))
+        if (len > sizeof(g_raw_data))
         {
-            ESP_LOGW(TAG, "Received message too long: %d bytes", len);
-            return BLE_ATT_ERR_INVALID_ATTR_VALUE_LEN;
+            ESP_LOGW(TAG, "Received raw message too long: %d bytes (truncating to %d)", len, (int)sizeof(g_raw_data));
+            len = sizeof(g_raw_data);
         }
 
-        int rc = ble_hs_mbuf_to_flat(ctxt->om, buf, sizeof(buf), &len);
+        int rc = ble_hs_mbuf_to_flat(ctxt->om, g_raw_data, sizeof(g_raw_data), &len);
         if (rc != 0)
         {
             return BLE_ATT_ERR_UNLIKELY;
         }
 
-        parse_and_callback_nav_data(buf, len);
+        g_raw_data_len = len;
+
+        ESP_LOGI(TAG, "Received %d bytes:", len);
+        ESP_LOG_BUFFER_HEX(TAG, g_raw_data, len);
+
         return 0;
     }
     else if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR)
@@ -234,9 +185,10 @@ static void ble_on_sync(void)
     ble_app_advertise();
 }
 
-void BLE_Manager_Init(ble_nav_data_callback_t callback)
+void BLE_Manager_Init(void)
 {
-    g_nav_callback = callback;
+    g_raw_data_len = 0;
+    memset(g_raw_data, 0, sizeof(g_raw_data));
     g_is_connected = false;
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
 
@@ -286,18 +238,23 @@ void BLE_Manager_Init(ble_nav_data_callback_t callback)
     }
 
     nimble_port_freertos_init(ble_host_task);
-
-    // 1 Hz, 8-byte payload
-    xTaskCreate(BLE_Send_Task, "BLE_Send_Task", 3072, NULL, 5, NULL);
 }
 
 void BLE_Manager_Deinit(void)
 {
     nimble_port_stop();
-    g_nav_callback = NULL;
     g_is_connected = false;
     g_conn_handle = BLE_HS_CONN_HANDLE_NONE;
     ESP_LOGI(TAG, "BLE Manager Deinitialized");
+}
+
+const uint8_t *BLE_Manager_GetRawData(uint16_t *len)
+{
+    if (len != NULL)
+    {
+        *len = g_raw_data_len;
+    }
+    return g_raw_data;
 }
 
 bool BLE_Manager_IsConnected(void)
@@ -348,36 +305,23 @@ void BLE_Send_Task(void *pvParameters)
 
         if (BLE_Manager_IsConnected())
         {
-            float pitch = IMU_App_GetPitch();
-            float roll = IMU_App_GetRoll();
             float yaw = IMU_App_GetYaw();
-
-            // Convert pitch, roll, yaw to 10-bit integers (0 to 1023)
-            // 3 angles x 10 bits = 30 bits total packed into 4 bytes
-            uint16_t pitch_10bit = (uint16_t)((int)pitch + 180) & 0x3FF;
-            uint16_t roll_10bit = (uint16_t)((int)roll + 180) & 0x3FF;
-            uint16_t yaw_10bit = (uint16_t)((int)yaw) & 0x3FF;
-
-            // Pack 30 bits into a 32-bit uint32_t container
-            uint32_t packed_30bit = ((uint32_t)pitch_10bit << 20) |
-                                    ((uint32_t)roll_10bit << 10) |
-                                    (uint32_t)yaw_10bit;
-
+            uint16_t nav_heading = (uint16_t)(int)yaw * 10;
             uint8_t payload[8];
-            payload[0] = 0xAA;                                   // Start frame
-            payload[1] = (uint8_t)((packed_30bit >> 24) & 0xFF); // Bits 24..31 (Top 2 bits reserved + Pitch MSBs)
-            payload[2] = (uint8_t)((packed_30bit >> 16) & 0xFF); // Bits 16..23
-            payload[3] = (uint8_t)((packed_30bit >> 8) & 0xFF);  // Bits 8..15
-            payload[4] = (uint8_t)(packed_30bit & 0xFF);         // Bits 0..7
-            payload[5] = 0x00;                                   // Reserved
-            payload[6] = 0x00;                                   // Reserved
-            payload[7] = 0x55;                                   // End frame
+            payload[0] = 0xAA;                          // Start frame
+            payload[1] = 0xBD;                          // Reserved (Speed OBD)
+            payload[2] = (uint8_t)(nav_heading >> 8);   // Heading MSB
+            payload[3] = (uint8_t)(nav_heading & 0xFF); // Heading LSB
+            payload[4] = 0x00;                          // Reserved
+            payload[5] = 0x00;                          // Reserved
+            payload[6] = 0x00;                          // Reserved
+            payload[7] = 0x55;                          // End frame
 
             esp_err_t err = BLE_Manager_SendData(payload, sizeof(payload));
             if (err == ESP_OK)
             {
-                ESP_LOGI(TAG, "BLE_Send_Task: Sent 8 bytes (10-bit angles packed: P=%d, R=%d, Y=%d)",
-                         (int)pitch, (int)roll, (int)yaw);
+                ESP_LOGI(TAG, "BLE_Send_Task: Y=%d, OBD=",
+                         (int)nav_heading);
             }
         }
     }

@@ -11,30 +11,24 @@
 
 #define BLE_SERVICE_UUID 0xFFE0
 #define BLE_CHARACTERISTIC_UUID 0xFFE1
-
-typedef struct
-{
-    uint8_t turn_direction;
-    uint8_t lane_index;
-    uint8_t total_lanes;
-    uint16_t distance_to_turn;
-} nav_data_t;
-
-/**
- * @brief Callback function type for received navigation data
- */
-typedef void (*ble_nav_data_callback_t)(const nav_data_t *nav_data);
+#define BLE_MAX_RAW_DATA_LEN 20
 
 /**
  * @brief Initialize BLE stack and start advertising as "ESP32_NAV"
- * @param callback Callback to execute when valid navigation data is received
  */
-void BLE_Manager_Init(ble_nav_data_callback_t callback);
+void BLE_Manager_Init(void);
 
 /**
  * @brief Stop BLE advertising and release resources if necessary
  */
 void BLE_Manager_Deinit(void);
+
+/**
+ * @brief Get pointer to the raw BLE data buffer received from the Android App
+ * @param len Pointer to store the length of received data in bytes
+ * @return Const pointer to the raw data buffer
+ */
+const uint8_t *BLE_Manager_GetRawData(uint16_t *len);
 
 /**
  * @brief Send data to the connected BLE master device via GATT notification
@@ -51,10 +45,9 @@ esp_err_t BLE_Manager_SendData(const uint8_t *data, uint16_t len);
 bool BLE_Manager_IsConnected(void);
 
 /**
- * @brief FreeRTOS task sending 8-byte payload (Start frame 0xAA, 10-bit pitch, 10-bit roll, 10-bit yaw, reserved padding, End frame 0x55) to BLE master once per second (1 Hz)
+ * @brief FreeRTOS task sending 8-byte payload to BLE master once per second (1 Hz)
  * @param pvParameters FreeRTOS task parameters (unused)
  */
 void BLE_Send_Task(void *pvParameters);
 
 #endif // BLE_MANAGER_H
-
