@@ -102,15 +102,6 @@ void check_flash() {
 
 static const char *TAG = "app_main"; // Define log tags
 
-static void on_nav_data_received(const nav_data_t *nav_data)
-{
-	ESP_LOGI(TAG, "Main Application Received Nav Data: Turn Direction = %d, Lane Index = %d, Total Lanes = %d, Distance = %d meters",
-			nav_data->turn_direction,
-			nav_data->lane_index,
-			nav_data->total_lanes,
-			nav_data->distance_to_turn);
-}
-
 void task_core1_function(void *pvParameters)
 {
 	while(1){
@@ -133,11 +124,20 @@ void app_main(void)
 	ESP_LOGI(TAG, "IMU app init complete");
 
 	ESP_LOGI(TAG, "BLE Manager init...");
-	BLE_Manager_Init(on_nav_data_received);
+	BLE_Manager_Init();
 	ESP_LOGI(TAG, "BLE Manager init complete");
 
-	/* Runs IMU_App_Update() at ~200 Hz and logs pitch/roll/yaw every 200 ms. */
 	IMU_App_StartTask(20);
+
+	/* Periodic BLE send task */
+	xTaskCreatePinnedToCore(
+		BLE_Send_Task, "BLE_Send_Task",
+		3072, NULL, 5, NULL, 0);
+
+	xTaskCreatePinnedToCore(
+		task_core1_function, "Task_On_Core1", // task func pointer, task name
+		3072, NULL, 5, NULL, 1				  // stack size, task param, priority, task handle, core id
+	);
 
 	while(1){
 		ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
