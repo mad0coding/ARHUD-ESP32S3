@@ -1,7 +1,8 @@
 #ifndef _BASICIO_H
 #define _BASICIO_H
 
-
+#include "esp_log.h"
+#include "esp_timer.h"
 
 // GPIO Input
 #define IO_KEY					GPIO_NUM_45
@@ -13,8 +14,8 @@
 
 // ADC Input
 #define ADC_UNIT				ADC_UNIT_1 // unit 1 (can be used with RF)
-#define ADC_CHANNEL_NTC			ADC_CHANNEL_0 // Channel0 <-> GPIO1
-#define ADC_CHANNEL_LDR			ADC_CHANNEL_1 // Channel1 <-> GPIO2
+#define ADC_CHANNEL_LDR			ADC_CHANNEL_0 // Channel0 <-> GPIO1
+#define ADC_CHANNEL_NTC			ADC_CHANNEL_1 // Channel1 <-> GPIO2
 #define ADC_RESOLUTION			ADC_BITWIDTH_DEFAULT // defalut 12bits (0-4095)
 #define ADC_ATTEN				ADC_ATTEN_DB_12 // 12dB attenuation (0-3.3V)
 
@@ -34,6 +35,7 @@
 
 
 // Operations
+#define GET_US()				(esp_timer_get_time())
 #define GET_KEY()				(!gpio_get_level(IO_KEY))
 #define SET_LED(x)				gpio_set_level(IO_LED, (x))
 #define SET_DISP(x)				gpio_set_level(IO_DISP, (x))
@@ -48,6 +50,8 @@
 								}while(0)
 
 
+
+void auto_backlight(uint8_t lightness);
 
 void io_main(void);
 

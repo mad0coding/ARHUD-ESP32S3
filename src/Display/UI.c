@@ -485,6 +485,8 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 		else if(time_till_next < 5) time_till_next = 5; // MIN
 		vTaskDelay(pdMS_TO_TICKS(time_till_next)); // wait for next rendering
 
+		auto_backlight(128);
+
 		navigation_arrow_set_angle(lv_tick_get() % 3600);
 		speed_display_set_value(lv_tick_get() / 500 % 201);
 
