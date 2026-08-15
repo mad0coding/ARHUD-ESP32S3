@@ -17,9 +17,10 @@
 
 #include "BasicIO.h"
 #include "BLEManager.h"
-#include "imu_app.h"
+#include "IMU_APP.h"
 #include "LcdRgb.h"
 #include "UI.h"
+#include "Comm.h"
 
 
 void sys_info(void){
@@ -113,6 +114,7 @@ void task_core1_function(void *pvParameters)
 void app_main(void)
 {
 	io_main();
+	comm_init(); // init comm
 
 	xTaskCreatePinnedToCore( // LVGL display task on core1
 		lvgl_task, "LVGL_Task", // task func pointer, task name
@@ -127,20 +129,19 @@ void app_main(void)
 	BLE_Manager_Init();
 	ESP_LOGI(TAG, "BLE Manager init complete");
 
-	IMU_App_StartTask(20);
+	xTaskCreatePinnedToCore( // IMU task on core0
+		IMU_App_Task, "imu_app_task", // task func pointer, task name
+		4096, NULL, 5, NULL, 0 // stack size, task param, priority, task handle, core id
+	);
 
 	/* Periodic BLE send task */
 	xTaskCreatePinnedToCore(
 		BLE_Send_Task, "BLE_Send_Task",
 		3072, NULL, 5, NULL, 0);
 
-	xTaskCreatePinnedToCore(
-		task_core1_function, "Task_On_Core1", // task func pointer, task name
-		3072, NULL, 5, NULL, 1				  // stack size, task param, priority, task handle, core id
-	);
 
 	while(1){
-		ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
+		// ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
 		vTaskDelay(pdMS_TO_TICKS(1000)); // 1000ms
 	}
 }

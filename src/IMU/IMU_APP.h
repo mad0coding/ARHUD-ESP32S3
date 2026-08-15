@@ -166,9 +166,8 @@ extern "C"
     /* Collect magnetometer samples and print the hard-iron offset values to the console. */
     void IMU_App_RunHardIronCalibration(void);
 
-    /* Start a FreeRTOS task that calls IMU_App_Update() in a loop and logs
-     * pitch/roll/yaw at the given interval. Call IMU_App_Init() before this. */
-    void IMU_App_StartTask(uint32_t log_period_ms);
+    /* FreeRTOS task. */
+    void IMU_App_Task(void *pvParameters);
 
 #ifdef __cplusplus
 }

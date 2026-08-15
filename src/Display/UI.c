@@ -4,6 +4,9 @@
 #include "lvgl.h"
 
 #include "LcdRgb.h"
+#include "Comm.h"
+
+static const char *TAG = "UI";
 
 // custom font
 LV_FONT_DECLARE(lv_font_MontserratBold_150);
@@ -468,6 +471,14 @@ static void lvgl_ui_init(void){
 	lane_indicator_create(scr); // create lane indicator at the top center
 }
 
+void ui_use_data(void){
+	uint8_t data[BLE_MAX_RAW_DATA_LEN];
+	uint8_t len = read_ble_in_buf(data); // read from ring buf
+	if(!len) return;
+	ESP_LOGI(TAG, "Received %d bytes:", len);
+	ESP_LOG_BUFFER_HEX(TAG, data, len);
+}
+
 void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 	SET_DISP(1); // enable screen first so it can receive RGB data before turning on backlight
 	init_rgb(); // init RGB interface
@@ -479,6 +490,8 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 	SET_PWM_LIGHT(1000); // set backlight PWM
 
 	while(1){
+		ui_use_data();
+
 		uint32_t time_till_next = lv_timer_handler(); // Let LVGL handle rendering and timers
 		// if(time_till_next < (uint32_t)-1) printf("time_till_next: %lu\n", time_till_next);
 		if(time_till_next > 30) time_till_next = 30; // MAX

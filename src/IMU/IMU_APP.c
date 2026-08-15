@@ -605,9 +605,9 @@ float IMU_App_GetYaw(void) { return s_imu.yaw_deg; }
 /* 11. FreeRTOS task                                                        */
 /* ------------------------------------------------------------------------ */
 
-static void IMU_App_Task(void *pvParameters)
+void IMU_App_Task(void *pvParameters)
 {
-    uint32_t log_period_ms = (uint32_t)(uintptr_t)pvParameters;
+    uint32_t log_period_ms = 20;
     TickType_t last_log_tick = xTaskGetTickCount();
     TickType_t log_period_ticks = pdMS_TO_TICKS(log_period_ms);
 
@@ -656,10 +656,4 @@ static void IMU_App_Task(void *pvParameters)
 
         vTaskDelayUntil(&xLastWakeTime, xFrequency);
     }
-}
-
-void IMU_App_StartTask(uint32_t log_period_ms)
-{
-    xTaskCreate(IMU_App_Task, "imu_app_task", 4096,
-                (void *)(uintptr_t)log_period_ms, 5, NULL);
 }
