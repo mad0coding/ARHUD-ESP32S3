@@ -117,28 +117,28 @@ void app_main(void)
 	io_main();
 	comm_init(); // init comm
 
-	xTaskCreatePinnedToCore( // LVGL display task on core1
-		lvgl_task, "LVGL_Task", // task func pointer, task name
-		4096, NULL, 5, NULL, 1 // stack size, task param, priority, task handle, core id
-	);
+	// xTaskCreatePinnedToCore( // LVGL display task on core1
+	// 	lvgl_task, "LVGL_Task", // task func pointer, task name
+	// 	4096, NULL, 5, NULL, 1 // stack size, task param, priority, task handle, core id
+	// );
 
-	ESP_LOGI(TAG, "IMU app init...");
-	IMU_App_Init(); /* I2C + BMX055 bring-up, gyro calibration, initial attitude */
-	ESP_LOGI(TAG, "IMU app init complete");
+	// ESP_LOGI(TAG, "IMU app init...");
+	// IMU_App_Init(); /* I2C + BMX055 bring-up, gyro calibration, initial attitude */
+	// ESP_LOGI(TAG, "IMU app init complete");
 
-	ESP_LOGI(TAG, "BLE Manager init...");
-	BLE_Manager_Init();
-	ESP_LOGI(TAG, "BLE Manager init complete");
+	// ESP_LOGI(TAG, "BLE Manager init...");
+	// BLE_Manager_Init();
+	// ESP_LOGI(TAG, "BLE Manager init complete");
 
-	xTaskCreatePinnedToCore( // IMU task on core0
-		IMU_App_Task, "imu_app_task", // task func pointer, task name
-		4096, NULL, 5, NULL, 0 // stack size, task param, priority, task handle, core id
-	);
+	// xTaskCreatePinnedToCore( // IMU task on core0
+	// 	IMU_App_Task, "imu_app_task", // task func pointer, task name
+	// 	4096, NULL, 5, NULL, 0 // stack size, task param, priority, task handle, core id
+	// );
 
-	/* Periodic BLE send task */
-	xTaskCreatePinnedToCore(
-		BLE_Send_Task, "BLE_Send_Task",
-		3072, NULL, 5, NULL, 0);
+	// /* Periodic BLE send task */
+	// xTaskCreatePinnedToCore(
+	// 	BLE_Send_Task, "BLE_Send_Task",
+	// 	3072, NULL, 5, NULL, 0);
 
 	xTaskCreatePinnedToCore( // OBD task on core0
 		obd_task, "obd_task", // task func pointer, task name
