@@ -36,6 +36,7 @@
 
 // Operations
 #define GET_US()				(esp_timer_get_time())
+#define GET_MS()				(esp_timer_get_time() / 1000)
 #define GET_KEY()				(!gpio_get_level(IO_KEY))
 #define SET_LED(x)				gpio_set_level(IO_LED, (x))
 #define SET_DISP(x)				gpio_set_level(IO_DISP, (x))
@@ -49,6 +50,8 @@
 									ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_FAN); \
 								}while(0)
 
+
+#define BIG_ENDIAN_16(p)		((uint16_t)((*(uint8_t*)(p) << 8) | *((uint8_t*)(p) + 1)))
 
 
 void auto_backlight(uint8_t lightness);

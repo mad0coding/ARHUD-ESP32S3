@@ -5,6 +5,7 @@
 
 #include "LcdRgb.h"
 #include "Comm.h"
+#include "OBD.h"
 
 static const char *TAG = "UI";
 
@@ -212,7 +213,7 @@ static void lane_indicator_set_data(uint8_t *data){
 		}else{
 			lv_obj_set_style_text_color(lane_indicator.labels[i], lv_color_hex(0xFFFFFF), LV_STATE_DEFAULT); // white
 		}
-		lv_label_set_text_fmt(lane_indicator.labels[i], "%X", label_num[i]); // set number
+		lv_label_set_text_fmt(lane_indicator.labels[i], "%d", label_num[i]); // set number
 	}
 }
 
@@ -471,12 +472,84 @@ static void lvgl_ui_init(void){
 	lane_indicator_create(scr); // create lane indicator at the top center
 }
 
-void ui_use_data(void){
+typedef struct{
+	uint8_t valid;
+	uint8_t speed_app;
+	uint16_t arrow_angle;
+	uint8_t sign_idx;
+	uint16_t sign_dist;
+	uint8_t speed_limit_app;
+	uint8_t line_data[3];
+}ble_packet_t;
+static ble_packet_t ble_packet;
+
+static void ui_use_data(void){
+	const uint32_t ble_lost_timeout = 1000 * 1000; // 1s
+	static uint32_t ble_last_time = -ble_lost_timeout;
 	uint8_t data[BLE_MAX_RAW_DATA_LEN];
 	uint8_t len = read_ble_in_buf(data); // read from ring buf
-	if(!len) return;
-	ESP_LOGI(TAG, "Received %d bytes:", len);
-	ESP_LOG_BUFFER_HEX(TAG, data, len);
+	if(len && data[0] == 1){ // valid packet
+		// ESP_LOGI(TAG, "Received %d bytes:", len);
+		// ESP_LOG_BUFFER_HEX(TAG, data, len);
+		ble_last_time = GET_US(); // update time
+		ble_packet.valid = 1; // ble data valid
+		ble_packet.speed_app = data[1];
+		ble_packet.arrow_angle = BIG_ENDIAN_16(data + 2);
+		ble_packet.sign_idx = data[4];
+		ble_packet.sign_dist = BIG_ENDIAN_16(data + 5);
+		ble_packet.speed_limit_app = data[7];
+		ble_packet.line_data[0] = data[8];
+		ble_packet.line_data[1] = data[9];
+		ble_packet.line_data[2] = data[10];
+	}
+	else if(ble_packet.valid){ // no valid packet and state is still valid
+		uint32_t ble_lost_time = ((uint32_t)GET_US() - ble_last_time);
+		if(ble_lost_time > ble_lost_timeout){ // timeout
+			ESP_LOGW(TAG, "BLE connection lost.");
+			// ble_packet defalut set
+			memset(&ble_packet, 0, sizeof(ble_packet)); // ble data not valid
+			ble_packet.speed_app = ble_packet.speed_limit_app = 255;
+			ble_packet.arrow_angle = 0xFFFF;
+		}
+	}
+
+	// speed
+	uint8_t prior_speed = 0, prior_speed_limit = 0; // 0-local(OBD/CV) 1-BLE
+	if(ble_packet.speed_app != 255 && 
+		(prior_speed || !obd_valid)){ // use BLE speed
+		speed_display_set_value(ble_packet.speed_app);
+	}
+	else if(obd_valid){ // use OBD speed
+		speed_display_set_value(obd_speed);
+	}
+	else{ // no valid speed
+		speed_display_set_value(-1);
+	}
+
+	// arrow angle
+	uint8_t arrow_angle_valid = (ble_packet.arrow_angle <= 3600);
+	if(arrow_angle_valid) navigation_arrow_set_angle(ble_packet.arrow_angle);
+	// speed display state
+	speed_display_set_state_anim(arrow_angle_valid);
+
+	// navigation sign
+	navigation_sign_set_sign(ble_packet.sign_idx);
+	navigation_sign_set_dist(ble_packet.sign_dist);
+
+	// speed limit
+	if(ble_packet.speed_limit_app != 255 &&
+		(prior_speed_limit || 1)){ // use BLE speed limit
+		speed_limit_sign_set_value(ble_packet.speed_limit_app);
+	}
+	else if(!prior_speed_limit && 0){ // use CV speed limit
+		speed_limit_sign_set_value(-1);
+	}
+	else{ // no valid speed limit
+		speed_limit_sign_set_value(-1);
+	}
+
+	// line data
+	lane_indicator_set_data(ble_packet.line_data);
 }
 
 void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
@@ -487,7 +560,9 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 	lvgl_ui_init(); // UI init
 
 	vTaskDelay(pdMS_TO_TICKS(150)); // wait for the screen to be stable (ready)
-	SET_PWM_LIGHT(1000); // set backlight PWM
+	SET_PWM_LIGHT(100); // set backlight PWM
+
+	ble_packet.valid = 1; // to trig ble_packet defalut set
 
 	while(1){
 		ui_use_data();
@@ -500,24 +575,24 @@ void lvgl_task(void *pvParameters){ // LVGL FreeRTOS task
 
 		auto_backlight(128);
 
-		navigation_arrow_set_angle(lv_tick_get() % 3600);
-		speed_display_set_value(lv_tick_get() / 500 % 201);
+		// navigation_arrow_set_angle(lv_tick_get() % 3600);
+		// speed_display_set_value(lv_tick_get() / 500 % 201);
 
 		static uint8_t key_old = 0; // key old state
 		static uint8_t cnt = 0;
 		if(key_old != GET_KEY()){ // edge
 			key_old = !key_old;
 			if(key_old){ // press edge
-				// SET_PWM_LIGHT((cnt % 4 + 1) * 500);
+				SET_PWM_LIGHT((cnt % 4 + 1) * 500);
 				printf("KEY pressed.\n");
-				speed_limit_sign_set_value(cnt*10);
+				// speed_limit_sign_set_value(cnt*10);
 				// speed_limit_sign_set_visible(cnt % 2);
 				// speed_display_set_state(cnt % 2);
-				speed_display_set_state_anim(cnt % 2);
-				navigation_sign_set_sign(cnt % 15);
+				// speed_display_set_state_anim(cnt % 2);
+				// navigation_sign_set_sign(cnt % 15);
 
-				uint8_t data[3] = {0x47, 0x88, 0xC9};
-				lane_indicator_set_data(data);
+				// uint8_t data[3] = {0x47, 0x88, 0xC9};
+				// lane_indicator_set_data(data);
 				cnt++;
 			}
 		}
