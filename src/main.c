@@ -21,6 +21,7 @@
 #include "LcdRgb.h"
 #include "UI.h"
 #include "Comm.h"
+#include "OBD.h"
 
 
 void sys_info(void){
@@ -139,6 +140,10 @@ void app_main(void)
 		BLE_Send_Task, "BLE_Send_Task",
 		3072, NULL, 5, NULL, 0);
 
+	xTaskCreatePinnedToCore( // OBD task on core0
+		obd_task, "obd_task", // task func pointer, task name
+		3072, NULL, 2, NULL, 0 // stack size, task param, priority, task handle, core id
+	);
 
 	while(1){
 		// ESP_LOGI(TAG, "Hello ESP32S3!"); // Output logs to UART
