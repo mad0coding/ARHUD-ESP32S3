@@ -6,7 +6,6 @@
 #include "driver/gpio.h"
 #include "driver/ledc.h"
 #include "esp_adc/adc_oneshot.h"
-#include "esp_log.h"
 
 
 static adc_oneshot_unit_handle_t adc1_handle = NULL;
@@ -115,16 +114,26 @@ void init_pwm(void) // PWM LEDC init
 	ledc_channel_config(&channel_10k);
 }
 
+void auto_backlight(uint8_t lightness){
+	int adc_val = -1;
+	adc_oneshot_read(adc1_handle, ADC_CHANNEL_LDR, &adc_val);
+	// printf("adc_ldr:%d\n", adc_val);
+}
+
 void io_main(void)
 {
 	init_gpio();
 	init_pwm();
 	init_adc();
 
+	SET_EXRST(0);
+	SET_DISP(0);
+	SET_PWM_LIGHT(0);
+
 	int led_state = 0;
 	int pwm_duty = 0;
 
-	while (0) {
+	while(0){
 		// read key (invert logic)
 		int btn_val = gpio_get_level(IO_KEY);
 		
@@ -152,9 +161,6 @@ void io_main(void)
 
 		vTaskDelay(pdMS_TO_TICKS(200));
 	}
-	gpio_set_level(IO_DISP, 1);
-	ESP_ERROR_CHECK(ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT, 500));
-	ESP_ERROR_CHECK(ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT));
 }
 
 

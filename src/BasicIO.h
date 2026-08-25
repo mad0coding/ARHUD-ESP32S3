@@ -1,7 +1,8 @@
 #ifndef _BASICIO_H
 #define _BASICIO_H
 
-
+#include "esp_log.h"
+#include "esp_timer.h"
 
 // GPIO Input
 #define IO_KEY					GPIO_NUM_45
@@ -13,8 +14,8 @@
 
 // ADC Input
 #define ADC_UNIT				ADC_UNIT_1 // unit 1 (can be used with RF)
-#define ADC_CHANNEL_NTC			ADC_CHANNEL_0 // Channel0 <-> GPIO1
-#define ADC_CHANNEL_LDR			ADC_CHANNEL_1 // Channel1 <-> GPIO2
+#define ADC_CHANNEL_LDR			ADC_CHANNEL_0 // Channel0 <-> GPIO1
+#define ADC_CHANNEL_NTC			ADC_CHANNEL_1 // Channel1 <-> GPIO2
 #define ADC_RESOLUTION			ADC_BITWIDTH_DEFAULT // defalut 12bits (0-4095)
 #define ADC_ATTEN				ADC_ATTEN_DB_12 // 12dB attenuation (0-3.3V)
 
@@ -33,8 +34,27 @@
 #define PWM_RESOLUTION_FAN		LEDC_TIMER_12_BIT // MAX 12 bits (0~4095)
 
 
+// Operations
+#define GET_US()				(esp_timer_get_time())
+#define GET_MS()				(esp_timer_get_time() / 1000)
+#define GET_KEY()				(!gpio_get_level(IO_KEY))
+#define SET_LED(x)				gpio_set_level(IO_LED, (x))
+#define SET_DISP(x)				gpio_set_level(IO_DISP, (x))
+#define SET_EXRST(x)			gpio_set_level(IO_EXRST, (x))
+#define SET_PWM_LIGHT(x)		do{ \
+									ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT, (x)); \
+									ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_LIGHT); \
+								}while(0)
+#define SET_PWM_FAN(x)			do{ \
+									ledc_set_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_FAN, (x)); \
+									ledc_update_duty(LEDC_LOW_SPEED_MODE, PWM_CHANNEL_FAN); \
+								}while(0)
 
 
+#define BIG_ENDIAN_16(p)		((uint16_t)((*(uint8_t*)(p) << 8) | *((uint8_t*)(p) + 1)))
+
+
+void auto_backlight(uint8_t lightness);
 
 void io_main(void);
 

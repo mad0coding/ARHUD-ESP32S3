@@ -3,6 +3,7 @@
 #include "esp_log.h"
 #include "nvs_flash.h"
 #include "imu_app.h"
+#include "Comm.h"
 
 /* BLE Includes */
 #include "nimble/nimble_port.h"
@@ -67,8 +68,9 @@ static int ble_gatt_svr_cb(uint16_t conn_handle, uint16_t attr_handle, struct bl
 
         g_raw_data_len = len;
 
-        ESP_LOGI(TAG, "Received %d bytes:", len);
-        ESP_LOG_BUFFER_HEX(TAG, g_raw_data, len);
+        // ESP_LOGI(TAG, "Received %d bytes:", len);
+        // ESP_LOG_BUFFER_HEX(TAG, g_raw_data, len);
+        write_ble_in_buf(g_raw_data, len); // buffer BLE data
 
         return 0;
     }
@@ -84,7 +86,7 @@ static void ble_app_advertise(void)
 {
     struct ble_gap_adv_params adv_params;
     struct ble_hs_adv_fields fields;
-    const char *name = "ESP32_NAV";
+    const char *name = "ARHUD";
     int rc;
 
     memset(&fields, 0, sizeof(fields));
@@ -230,7 +232,7 @@ void BLE_Manager_Init(void)
     }
 
     // Set Device Name
-    rc = ble_svc_gap_device_name_set("ESP32_NAV");
+    rc = ble_svc_gap_device_name_set("ARHUD");
     if (rc != 0)
     {
         ESP_LOGE(TAG, "Error setting GAP device name; rc=%d", rc);
@@ -238,6 +240,12 @@ void BLE_Manager_Init(void)
     }
 
     nimble_port_freertos_init(ble_host_task);
+
+    // disable NimBLE log
+    esp_log_level_set("NimBLE", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEClient", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEServer", ESP_LOG_NONE);
+    esp_log_level_set("NimBLEScan", ESP_LOG_NONE);
 }
 
 void BLE_Manager_Deinit(void)
@@ -290,7 +298,7 @@ esp_err_t BLE_Manager_SendData(const uint8_t *data, uint16_t len)
         return ESP_FAIL;
     }
 
-    ESP_LOGI(TAG, "Sent %d bytes to BLE master", len);
+    // ESP_LOGI(TAG, "Sent %d bytes to BLE master", len);
     return ESP_OK;
 }
 
@@ -320,8 +328,7 @@ void BLE_Send_Task(void *pvParameters)
             esp_err_t err = BLE_Manager_SendData(payload, sizeof(payload));
             if (err == ESP_OK)
             {
-                ESP_LOGI(TAG, "BLE_Send_Task: Y=%d, OBD=",
-                         (int)nav_heading);
+                // ESP_LOGI(TAG, "BLE_Send_Task: Y=%d, OBD=", (int)nav_heading);
             }
         }
     }

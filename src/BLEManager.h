@@ -14,7 +14,7 @@
 #define BLE_MAX_RAW_DATA_LEN 20
 
 /**
- * @brief Initialize BLE stack and start advertising as "ESP32_NAV"
+ * @brief Initialize BLE stack and start advertising as "ARHUD"
  */
 void BLE_Manager_Init(void);
 
